@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spine Auxiliary Tools</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #1d2733;
+      --muted: #667085;
+      --line: #d8dee7;
+      --accent: #1f7a8c;
+      --accent-dark: #165c6a;
+      --green: #256f5c;
+      --shadow: 0 16px 40px rgba(17, 24, 39, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(1040px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 40px 0;
+    }
+
+    header {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(30px, 5vw, 52px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .card {
+      min-height: 260px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .tag {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 4px 9px;
+      background: #edf8fa;
+      color: var(--accent-dark);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .tag.green {
+      background: #eef8f3;
+      color: var(--green);
+    }
+
+    h2 {
+      margin-top: 12px;
+      font-size: 22px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .desc {
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    ul {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    a.button {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 40px;
+      width: fit-content;
+      border-radius: 6px;
+      padding: 9px 13px;
+      color: #fff;
+      background: var(--accent);
+      text-decoration: none;
+      font-weight: 750;
+    }
+
+    a.button:hover {
+      background: var(--accent-dark);
+    }
+
+    .button.green {
+      background: var(--green);
+    }
+
+    .button.green:hover {
+      background: #1b5748;
+    }
+
+    .note {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 14px;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .links a {
+      color: var(--accent-dark);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .links a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        padding: 28px 0;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Spine Auxiliary Tools</h1>
+      <p class="lead">离线可用的 Spine 资源辅助工具。Extract Spine atlas images and generate Photoshop JSX scripts directly in your browser.</p>
+    </header>
+
+    <section class="grid" aria-label="Tools">
+      <article class="card">
+        <div>
+          <span class="tag green">Atlas / Images</span>
+          <h2>Spine Atlas 切图工具</h2>
+          <p class="desc">从 `.atlas` 与合图 PNG 中导出独立切图，可选 JSON 辅助按 attachment / UV 导出更细的图像。</p>
+          <ul>
+            <li>支持拖入 atlas、PNG、JSON</li>
+            <li>处理 rotate、orig、offset</li>
+            <li>输出 images.zip</li>
+          </ul>
+        </div>
+        <a class="button green" href="spine-atlas-to-images.html">打开工具 / Open Tool</a>
+      </article>
+
+      <article class="card">
+        <div>
+          <span class="tag">JSON / Photoshop</span>
+          <h2>Spine JSON 转 Photoshop JSX</h2>
+          <p class="desc">读取 Spine JSON 的 bones、slots、skins 与附件信息，生成可在 Photoshop 中执行的图层重建脚本。</p>
+          <ul>
+            <li>按 setup pose 视觉还原</li>
+            <li>保留 Spine slot 绘制顺序</li>
+            <li>生成可下载的 JSX</li>
+          </ul>
+        </div>
+        <a class="button" href="spine-json-to-photoshop-jsx.html">打开工具 / Open Tool</a>
+      </article>
+    </section>
+
+    <section class="note">
+      <p>所有处理都在浏览器本地完成，不需要上传资源文件。All processing happens locally in your browser; asset files are not uploaded to a server.</p>
+      <div class="links">
+        <a href="README.md">README</a>
+        <a href="https://github.com/FrostFei/Spine_Auxiliary-tools">GitHub Repository</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
