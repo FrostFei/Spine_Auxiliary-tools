@@ -1012,7 +1012,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       const height = Math.round(project.canvas.height * options.scale);
       const layerData = layers.map(layer => ({
         file: layer.fileName,
-        name: String(layer.renderOrder).padStart(4, "0") + " " + layer.id,
+        name: layer.fileName,
         left: layer.left,
         top: layer.top,
         opacity: Math.round(layer.opacity * 10) / 10,
