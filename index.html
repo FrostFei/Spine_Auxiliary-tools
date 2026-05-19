@@ -204,16 +204,16 @@
       </article>
       <article class="card">
         <div>
-          <span class="tag green">PNG / Atlas</span>
-          <h2>PNG Atlas Packer</h2>
-          <p class="desc">Pack split PNG slices back into atlas PNG pages while keeping natural filename order by default.</p>
+          <span class="tag">Live2D / Texture</span>
+          <h2>Live2D 切图反向还原图集</h2>
+          <p class="desc">读取原 model3、moc3 与 textures，把修改后的 slices 按 ArtMesh UV 三角形烘回原 Live2D 图集。</p>
           <ul>
-            <li>Preserves original atlas order by filename</li>
-            <li>Exports atlas PNG pages plus JSON / TSV mapping</li>
-            <li>Optional padding, edge extrude, trim, and power-of-two pages</li>
+            <li>根据 moc3 drawable 顶点和 UV 反向映射</li>
+            <li>优先使用 PSD 重建包的 manifest.json 精确定位切图</li>
+            <li>输出路径与 model3.json 的 texture 引用一致</li>
           </ul>
         </div>
-        <a class="button green" href="png-atlas-packer.html">Open Tool</a>
+        <a class="button" href="live2d-texture-rebuilder.html">打开工具 / Open Tool</a>
       </article>
 
       <article class="card">
