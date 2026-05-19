@@ -1066,6 +1066,29 @@ app.bringToFront();
 
     var bounds = layer.bounds;
     layer.translate(UnitValue(info.left - px(bounds[0]), "px"), UnitValue(info.top - px(bounds[1]), "px"));
+    return layer;
+  }
+
+  function removeStarterLayer(doc, starterLayer, starterLayerName, placedCount) {
+    if (placedCount <= 0) return;
+    try {
+      if (starterLayer && starterLayer.name === starterLayerName && doc.layers.length > placedCount) {
+        doc.activeLayer = starterLayer;
+        starterLayer.remove();
+        return;
+      }
+    } catch (ignoreStarterRef) {}
+
+    try {
+      for (var i = doc.layers.length - 1; i >= 0; i--) {
+        var layer = doc.layers[i];
+        if (layer.name === starterLayerName && doc.layers.length > placedCount) {
+          doc.activeLayer = layer;
+          layer.remove();
+          return;
+        }
+      }
+    } catch (ignoreStarterSearch) {}
   }
 
   try {
@@ -1079,7 +1102,10 @@ app.bringToFront();
 
     var doc = app.documents.add(DOC_WIDTH, DOC_HEIGHT, 72, DOC_NAME, NewDocumentMode.RGB, DocumentFill.TRANSPARENT);
     var starterLayer = doc.activeLayer;
+    var starterLayerName = "__live2d_empty_starter__";
+    try { starterLayer.name = starterLayerName; } catch (ignoreStarterName) {}
     var missing = [];
+    var placed = 0;
 
     for (var i = 0; i < layers.length; i++) {
       var info = layers[i];
@@ -1088,10 +1114,10 @@ app.bringToFront();
         missing.push(info.file);
         continue;
       }
-      placeLayer(doc, file, info);
+      if (placeLayer(doc, file, info)) placed++;
     }
 
-    try { starterLayer.remove(); } catch (ignoreRemove) {}
+    removeStarterLayer(doc, starterLayer, starterLayerName, placed);
 
     if (missing.length) {
       alert("Some slice images are missing. Skipped: " + missing.length);
