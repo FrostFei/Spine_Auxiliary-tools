@@ -1,0 +1,1318 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spine JSON to Photoshop JSX</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #1c2430;
+      --muted: #667085;
+      --line: #d7dde5;
+      --accent: #1f7a8c;
+      --accent-strong: #165c6a;
+      --ok: #287a45;
+      --warn: #ad6b00;
+      --bad: #b42318;
+      --code: #111827;
+      --code-bg: #f8fafc;
+      --shadow: 0 16px 40px rgba(17, 24, 39, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    .app {
+      width: min(1280px, calc(100vw - 32px));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 24px 0;
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .side {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .main {
+      min-height: calc(100vh - 48px);
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto minmax(280px, 1fr) auto;
+      gap: 12px;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    h2 {
+      font-size: 16px;
+      line-height: 1.25;
+    }
+
+    .subtle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .drop {
+      position: relative;
+      min-height: 172px;
+      border: 1px dashed #9aa7b8;
+      border-radius: 8px;
+      background: #fbfcfe;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      cursor: pointer;
+      transition: border-color 140ms ease, background 140ms ease;
+    }
+
+    .drop.is-dragging {
+      border-color: var(--accent);
+      background: #edf8fa;
+    }
+
+    .drop input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .drop-text {
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .drop-title {
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .drop-note {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .fields {
+      display: grid;
+      gap: 10px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .field input {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      background: #fff;
+      padding: 8px 10px;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      min-height: 38px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    button:not(:disabled):hover {
+      background: var(--accent-strong);
+    }
+
+    button.secondary:not(:disabled):hover {
+      background: #f5f7fa;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px;
+      min-height: 68px;
+      background: #fbfcfe;
+    }
+
+    .stat-value {
+      font-size: 21px;
+      font-weight: 750;
+      line-height: 1.1;
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+
+    .stat-label {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .messages {
+      display: grid;
+      gap: 8px;
+    }
+
+    .message {
+      border-radius: 6px;
+      padding: 9px 10px;
+      font-size: 13px;
+      border: 1px solid var(--line);
+      background: #fbfcfe;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .message.ok {
+      color: var(--ok);
+      border-color: #b8dec6;
+      background: #f0fbf4;
+    }
+
+    .message.warn {
+      color: var(--warn);
+      border-color: #f1cf8b;
+      background: #fff8ea;
+    }
+
+    .message.bad {
+      color: var(--bad);
+      border-color: #f3b8b3;
+      background: #fff1f0;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100%;
+      min-height: 320px;
+      resize: none;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--code-bg);
+      color: var(--code);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre;
+      overflow: auto;
+    }
+
+    .layer-list {
+      max-height: 190px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th,
+    td {
+      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      z-index: 1;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    td.name {
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .main {
+        min-height: 640px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="panel side">
+      <div>
+        <h1>Spine JSON 转 Photoshop JSX</h1>
+        <p class="subtle">Setup pose / slot 顺序 / 相对画布</p>
+      </div>
+
+      <label id="dropZone" class="drop">
+        <input id="fileInput" type="file" accept=".json,application/json">
+        <span class="drop-text">
+          <span class="drop-title">拖入 .json</span>
+          <span id="fileName" class="drop-note">或点击选择文件</span>
+        </span>
+      </label>
+
+      <div class="fields">
+        <div class="field">
+          <label for="docName">文档名</label>
+          <input id="docName" type="text" value="spine_rebuild">
+        </div>
+        <div class="field">
+          <label for="padding">画布留白 px</label>
+          <input id="padding" type="number" min="0" step="1" value="24">
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button id="regenerate" type="button" disabled>重新生成</button>
+        <button id="copyScript" class="secondary" type="button" disabled>复制 JSX</button>
+        <button id="downloadScript" class="secondary" type="button" disabled>下载 JSX</button>
+      </div>
+
+      <div id="stats" class="stats"></div>
+      <div id="messages" class="messages"></div>
+    </section>
+
+    <section class="panel main">
+      <div class="toolbar">
+        <div>
+          <h2>Photoshop 脚本</h2>
+          <p class="subtle">在 Photoshop 里运行后选择对应的 images 文件夹</p>
+        </div>
+      </div>
+
+      <textarea id="scriptOutput" readonly spellcheck="false"></textarea>
+
+      <div class="layer-list">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>层名</th>
+              <th>类型</th>
+              <th>X</th>
+              <th>Y</th>
+              <th>W</th>
+              <th>H</th>
+              <th>旋转</th>
+            </tr>
+          </thead>
+          <tbody id="layerRows">
+            <tr>
+              <td colspan="8">等待 JSON</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var DEG = Math.PI / 180;
+      var state = {
+        json: null,
+        file: null,
+        manifest: null,
+        script: ""
+      };
+
+      var fileInput = document.getElementById("fileInput");
+      var dropZone = document.getElementById("dropZone");
+      var fileName = document.getElementById("fileName");
+      var docName = document.getElementById("docName");
+      var padding = document.getElementById("padding");
+      var regenerate = document.getElementById("regenerate");
+      var copyScript = document.getElementById("copyScript");
+      var downloadScript = document.getElementById("downloadScript");
+      var scriptOutput = document.getElementById("scriptOutput");
+      var stats = document.getElementById("stats");
+      var messages = document.getElementById("messages");
+      var layerRows = document.getElementById("layerRows");
+
+      fileInput.addEventListener("change", function () {
+        if (fileInput.files && fileInput.files[0]) readJsonFile(fileInput.files[0]);
+      });
+
+      ["dragenter", "dragover"].forEach(function (eventName) {
+        dropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          dropZone.classList.add("is-dragging");
+        });
+      });
+
+      ["dragleave", "drop"].forEach(function (eventName) {
+        dropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          dropZone.classList.remove("is-dragging");
+        });
+      });
+
+      dropZone.addEventListener("drop", function (event) {
+        var file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file) readJsonFile(file);
+      });
+
+      regenerate.addEventListener("click", generate);
+      docName.addEventListener("input", function () {
+        if (state.json) generate();
+      });
+      padding.addEventListener("input", function () {
+        if (state.json) generate();
+      });
+
+      copyScript.addEventListener("click", function () {
+        if (!state.script) return;
+        scriptOutput.focus();
+        scriptOutput.select();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(state.script).then(function () {
+            renderMessages([{ type: "ok", text: "已复制 JSX。" }], true);
+          }).catch(function () {
+            document.execCommand("copy");
+            renderMessages([{ type: "ok", text: "已选中并复制 JSX。" }], true);
+          });
+        } else {
+          document.execCommand("copy");
+          renderMessages([{ type: "ok", text: "已选中并复制 JSX。" }], true);
+        }
+      });
+
+      downloadScript.addEventListener("click", function () {
+        if (!state.script) return;
+        var baseName = safeFileBase((docName.value || "spine_rebuild").trim() || "spine_rebuild");
+        var blob = new Blob([state.script], { type: "text/plain;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = baseName + ".jsx";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+
+      function readJsonFile(file) {
+        var reader = new FileReader();
+        reader.onload = function () {
+          try {
+            state.json = JSON.parse(String(reader.result));
+            state.file = file;
+            fileName.textContent = file.name;
+            if (!docName.value || docName.value === "spine_rebuild") {
+              docName.value = safeFileBase(file.name.replace(/\.json$/i, "")) || "spine_rebuild";
+            }
+            generate();
+          } catch (error) {
+            clearOutput();
+            renderMessages([{ type: "bad", text: "JSON 解析失败：" + error.message }]);
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      function generate() {
+        if (!state.json) return;
+        try {
+          var manifest = buildManifest(state.json, {
+            name: (docName.value || "spine_rebuild").trim() || "spine_rebuild",
+            padding: Math.max(0, Number(padding.value) || 0)
+          });
+          state.manifest = manifest;
+          state.script = buildJsx(manifest);
+          scriptOutput.value = state.script;
+          regenerate.disabled = false;
+          copyScript.disabled = false;
+          downloadScript.disabled = false;
+          renderStats(manifest);
+          renderLayerRows(manifest.layers);
+          renderMessages(manifest.messages);
+        } catch (error) {
+          state.manifest = null;
+          state.script = "";
+          scriptOutput.value = "";
+          renderLayerRows([]);
+          renderStats(null);
+          renderMessages([{ type: "bad", text: error.message }]);
+        }
+      }
+
+      function clearOutput() {
+        state.manifest = null;
+        state.script = "";
+        scriptOutput.value = "";
+        regenerate.disabled = true;
+        copyScript.disabled = true;
+        downloadScript.disabled = true;
+        renderStats(null);
+        renderLayerRows([]);
+      }
+
+      function buildManifest(spine, options) {
+        if (!spine || !Array.isArray(spine.bones) || !Array.isArray(spine.slots)) {
+          throw new Error("不是可识别的 Spine JSON：缺少 bones 或 slots。");
+        }
+
+        var boneBuild = buildBones(spine.bones);
+        var bones = boneBuild.bones;
+        var skins = normalizeSkins(spine.skins || {});
+        var layers = [];
+        var skipped = [];
+        var typeCount = {};
+        var warningMessages = boneBuild.messages.slice();
+
+        for (var i = 0; i < spine.slots.length; i++) {
+          var slot = spine.slots[i];
+          var attachmentName = slot.attachment;
+          if (!attachmentName) {
+            skipped.push(slot.name + "：无默认 attachment");
+            continue;
+          }
+
+          var found = findAttachment(skins, slot.name, attachmentName);
+          if (!found) {
+            skipped.push(slot.name + "：找不到 attachment " + attachmentName);
+            continue;
+          }
+
+          var attachment = found.attachment;
+          var type = attachment.type || "region";
+          typeCount[type] = (typeCount[type] || 0) + 1;
+
+          if (type === "clipping" || type === "boundingbox" || type === "path" || type === "point") {
+            skipped.push(slot.name + "：" + type + " 不生成图层");
+            continue;
+          }
+
+          var slotBone = boneBuild.byName[slot.bone];
+          if (!slotBone) {
+            skipped.push(slot.name + "：找不到 bone " + slot.bone);
+            continue;
+          }
+
+          var layer = null;
+          var imagePath = attachment.path || attachmentName;
+          if (type === "region") {
+            layer = computeRegionLayer(slot, attachment, slotBone, imagePath);
+          } else if (type === "mesh" || type === "skinnedmesh") {
+            layer = computeMeshLayer(slot, attachment, slotBone, bones, imagePath);
+          } else {
+            skipped.push(slot.name + "：" + type + " 暂不支持");
+            continue;
+          }
+
+          if (!layer) {
+            skipped.push(slot.name + "：无法计算位置");
+            continue;
+          }
+
+          var alpha = parseAlpha(slot.color) * parseAlpha(attachment.color);
+          layer.order = i + 1;
+          layer.slot = slot.name;
+          layer.attachment = attachmentName;
+          layer.image = imagePath;
+          layer.name = imageLayerName(imagePath);
+          layer.opacity = round(clamp(alpha * 100, 0, 100), 2);
+          layer.ps = null;
+          layers.push(layer);
+        }
+
+        if (!layers.length) {
+          throw new Error("没有可导出的 region 或 mesh 图层。");
+        }
+
+        var worldBounds = collectBounds(layers);
+        var pad = Math.max(0, Number(options.padding) || 0);
+        var width = Math.max(1, Math.ceil(worldBounds.maxX - worldBounds.minX + pad * 2));
+        var height = Math.max(1, Math.ceil(worldBounds.maxY - worldBounds.minY + pad * 2));
+
+        layers.forEach(function (layer) {
+          layer.ps = {
+            x: round(layer.center.x - worldBounds.minX + pad, 3),
+            y: round(worldBounds.maxY - layer.center.y + pad, 3),
+            width: round(Math.max(1, layer.width), 3),
+            height: round(Math.max(1, layer.height), 3),
+            rotation: round(-layer.rotation, 3)
+          };
+        });
+
+        var meshCount = layers.filter(function (layer) { return layer.type === "mesh" || layer.type === "skinnedmesh"; }).length;
+        if (meshCount) {
+          warningMessages.push({
+            type: "warn",
+            text: meshCount + " 个 mesh 会用拟合变换放入 PS；复杂弯曲不会在 JSX 中做三角形变形。"
+          });
+        }
+        if (skipped.length) {
+          warningMessages.push({
+            type: "warn",
+            text: "跳过 " + skipped.length + " 项：" + skipped.slice(0, 6).join("；") + (skipped.length > 6 ? "；..." : "")
+          });
+        }
+
+        warningMessages.unshift({
+          type: "ok",
+          text: "已生成 " + layers.length + " 个图层，画布 " + width + " x " + height + " px。"
+        });
+
+        return {
+          name: options.name || "spine_rebuild",
+          source: spine.skeleton && spine.skeleton.hash ? spine.skeleton.hash : "",
+          spineVersion: spine.skeleton && spine.skeleton.spine ? spine.skeleton.spine : "",
+          width: width,
+          height: height,
+          padding: pad,
+          worldBounds: {
+            minX: round(worldBounds.minX, 3),
+            minY: round(worldBounds.minY, 3),
+            maxX: round(worldBounds.maxX, 3),
+            maxY: round(worldBounds.maxY, 3)
+          },
+          stats: {
+            bones: spine.bones.length,
+            slots: spine.slots.length,
+            skins: skins.length,
+            layers: layers.length,
+            skipped: skipped.length,
+            regions: layers.filter(function (layer) { return layer.type === "region"; }).length,
+            meshes: meshCount,
+            attachmentTypes: typeCount
+          },
+          messages: warningMessages,
+          layers: layers.map(function (layer) {
+            return {
+              order: layer.order,
+              name: layer.name,
+              slot: layer.slot,
+              attachment: layer.attachment,
+              image: stripKnownImageExtension(layer.image),
+              type: layer.type,
+              x: layer.ps.x,
+              y: layer.ps.y,
+              width: layer.ps.width,
+              height: layer.ps.height,
+              rotation: layer.ps.rotation,
+              opacity: layer.opacity
+            };
+          })
+        };
+      }
+
+      function buildBones(boneData) {
+        var bones = [];
+        var byName = {};
+        var messages = [];
+        var unsupported = 0;
+
+        for (var i = 0; i < boneData.length; i++) {
+          var data = boneData[i];
+          var bone = {
+            index: i,
+            name: data.name,
+            data: data,
+            parent: data.parent ? byName[data.parent] : null,
+            a: 1,
+            b: 0,
+            c: 0,
+            d: 1,
+            worldX: 0,
+            worldY: 0
+          };
+
+          if (data.transform && data.transform !== "normal") unsupported++;
+          if (data.inheritRotation === false || data.inheritScale === false) unsupported++;
+
+          var x = numberOr(data.x, 0);
+          var y = numberOr(data.y, 0);
+          var rotation = numberOr(data.rotation, 0);
+          var scaleX = numberOr(data.scaleX, 1);
+          var scaleY = numberOr(data.scaleY, 1);
+          var shearX = numberOr(data.shearX, 0);
+          var shearY = numberOr(data.shearY, 0);
+
+          var rotationX = (rotation + shearX) * DEG;
+          var rotationY = (rotation + 90 + shearY) * DEG;
+          var la = Math.cos(rotationX) * scaleX;
+          var lc = Math.sin(rotationX) * scaleX;
+          var lb = Math.cos(rotationY) * scaleY;
+          var ld = Math.sin(rotationY) * scaleY;
+
+          if (bone.parent) {
+            bone.worldX = bone.parent.a * x + bone.parent.b * y + bone.parent.worldX;
+            bone.worldY = bone.parent.c * x + bone.parent.d * y + bone.parent.worldY;
+            bone.a = bone.parent.a * la + bone.parent.b * lc;
+            bone.b = bone.parent.a * lb + bone.parent.b * ld;
+            bone.c = bone.parent.c * la + bone.parent.d * lc;
+            bone.d = bone.parent.c * lb + bone.parent.d * ld;
+          } else {
+            bone.worldX = x;
+            bone.worldY = y;
+            bone.a = la;
+            bone.b = lb;
+            bone.c = lc;
+            bone.d = ld;
+          }
+
+          bones.push(bone);
+          byName[bone.name] = bone;
+        }
+
+        if (unsupported) {
+          messages.push({
+            type: "warn",
+            text: unsupported + " 根骨骼使用非普通继承模式；工具会按普通骨骼矩阵近似。"
+          });
+        }
+
+        return { bones: bones, byName: byName, messages: messages };
+      }
+
+      function computeRegionLayer(slot, attachment, bone, imagePath) {
+        var width = numberOr(attachment.width, 0);
+        var height = numberOr(attachment.height, 0);
+        if (!width || !height) return null;
+
+        var local = regionLocalTransform(attachment);
+        var corners = [
+          transformPoint(bone, applyLocal(local, -width / 2, -height / 2)),
+          transformPoint(bone, applyLocal(local, width / 2, -height / 2)),
+          transformPoint(bone, applyLocal(local, width / 2, height / 2)),
+          transformPoint(bone, applyLocal(local, -width / 2, height / 2))
+        ];
+        var center = averagePoints(corners);
+        var widthVec = sub(corners[1], corners[0]);
+        var heightVec = sub(corners[3], corners[0]);
+
+        return {
+          type: "region",
+          image: imagePath,
+          center: center,
+          width: Math.max(1, length(widthVec)),
+          height: Math.max(1, length(heightVec)),
+          rotation: Math.atan2(widthVec.y, widthVec.x) / DEG,
+          corners: corners
+        };
+      }
+
+      function computeMeshLayer(slot, attachment, slotBone, bones, imagePath) {
+        var uvs = attachment.uvs || [];
+        var worldVertices = computeMeshWorldVertices(attachment, slotBone, bones);
+        if (!uvs.length || worldVertices.length < 2) return null;
+
+        var fitted = fitAffineFromUvs(uvs, worldVertices);
+        var bounds = pointsBounds(worldVertices);
+        var center;
+        var width;
+        var height;
+        var rotation;
+
+        if (fitted && isFinite(fitted.width) && isFinite(fitted.height) && fitted.width > 0.001 && fitted.height > 0.001) {
+          center = { x: fitted.tx, y: fitted.ty };
+          width = fitted.width;
+          height = fitted.height;
+          rotation = fitted.rotation;
+        } else {
+          center = {
+            x: (bounds.minX + bounds.maxX) / 2,
+            y: (bounds.minY + bounds.maxY) / 2
+          };
+          width = Math.max(1, bounds.maxX - bounds.minX);
+          height = Math.max(1, bounds.maxY - bounds.minY);
+          rotation = 0;
+        }
+
+        return {
+          type: attachment.type || "mesh",
+          image: imagePath,
+          center: center,
+          width: Math.max(1, width),
+          height: Math.max(1, height),
+          rotation: rotation,
+          corners: rectCorners(center, Math.max(1, width), Math.max(1, height), rotation)
+        };
+      }
+
+      function computeMeshWorldVertices(attachment, slotBone, bones) {
+        var uvs = attachment.uvs || [];
+        var vertices = attachment.vertices || [];
+        var result = [];
+        if (!uvs.length || !vertices.length) return result;
+
+        if (vertices.length === uvs.length) {
+          for (var i = 0; i < vertices.length; i += 2) {
+            result.push(transformPoint(slotBone, { x: vertices[i], y: vertices[i + 1] }));
+          }
+          return result;
+        }
+
+        var index = 0;
+        var vertexCount = uvs.length / 2;
+        for (var v = 0; v < vertexCount; v++) {
+          var boneCount = Math.round(vertices[index++]);
+          var wx = 0;
+          var wy = 0;
+          for (var b = 0; b < boneCount; b++) {
+            var boneIndex = Math.round(vertices[index++]);
+            var vx = vertices[index++];
+            var vy = vertices[index++];
+            var weight = vertices[index++];
+            var bone = bones[boneIndex];
+            if (!bone) continue;
+            wx += (bone.a * vx + bone.b * vy + bone.worldX) * weight;
+            wy += (bone.c * vx + bone.d * vy + bone.worldY) * weight;
+          }
+          result.push({ x: wx, y: wy });
+        }
+        return result;
+      }
+
+      function fitAffineFromUvs(uvs, points) {
+        var n = Math.min(points.length, uvs.length / 2);
+        if (n < 3) return null;
+
+        var sxx = 0;
+        var sxy = 0;
+        var syy = 0;
+        var sx = 0;
+        var sy = 0;
+        var rx0 = 0;
+        var rx1 = 0;
+        var rx2 = 0;
+        var ry0 = 0;
+        var ry1 = 0;
+        var ry2 = 0;
+
+        for (var i = 0; i < n; i++) {
+          var x = uvs[i * 2] - 0.5;
+          var y = 0.5 - uvs[i * 2 + 1];
+          var p = points[i];
+          sxx += x * x;
+          sxy += x * y;
+          syy += y * y;
+          sx += x;
+          sy += y;
+          rx0 += x * p.x;
+          rx1 += y * p.x;
+          rx2 += p.x;
+          ry0 += x * p.y;
+          ry1 += y * p.y;
+          ry2 += p.y;
+        }
+
+        var matrix = [
+          [sxx, sxy, sx],
+          [sxy, syy, sy],
+          [sx, sy, n]
+        ];
+        var solvedX = solve3(matrix, [rx0, rx1, rx2]);
+        var solvedY = solve3(matrix, [ry0, ry1, ry2]);
+        if (!solvedX || !solvedY) return null;
+
+        var a = solvedX[0];
+        var b = solvedX[1];
+        var tx = solvedX[2];
+        var c = solvedY[0];
+        var d = solvedY[1];
+        var ty = solvedY[2];
+
+        return {
+          tx: tx,
+          ty: ty,
+          width: Math.sqrt(a * a + c * c),
+          height: Math.sqrt(b * b + d * d),
+          rotation: Math.atan2(c, a) / DEG
+        };
+      }
+
+      function solve3(matrix, vector) {
+        var m = [
+          [matrix[0][0], matrix[0][1], matrix[0][2], vector[0]],
+          [matrix[1][0], matrix[1][1], matrix[1][2], vector[1]],
+          [matrix[2][0], matrix[2][1], matrix[2][2], vector[2]]
+        ];
+
+        for (var col = 0; col < 3; col++) {
+          var pivot = col;
+          for (var row = col + 1; row < 3; row++) {
+            if (Math.abs(m[row][col]) > Math.abs(m[pivot][col])) pivot = row;
+          }
+          if (Math.abs(m[pivot][col]) < 1e-10) return null;
+          if (pivot !== col) {
+            var tmp = m[col];
+            m[col] = m[pivot];
+            m[pivot] = tmp;
+          }
+
+          var div = m[col][col];
+          for (var j = col; j < 4; j++) m[col][j] /= div;
+          for (var r = 0; r < 3; r++) {
+            if (r === col) continue;
+            var factor = m[r][col];
+            for (var k = col; k < 4; k++) m[r][k] -= factor * m[col][k];
+          }
+        }
+
+        return [m[0][3], m[1][3], m[2][3]];
+      }
+
+      function regionLocalTransform(attachment) {
+        var rotation = numberOr(attachment.rotation, 0) * DEG;
+        var scaleX = numberOr(attachment.scaleX, 1);
+        var scaleY = numberOr(attachment.scaleY, 1);
+        var cos = Math.cos(rotation);
+        var sin = Math.sin(rotation);
+        return {
+          x: numberOr(attachment.x, 0),
+          y: numberOr(attachment.y, 0),
+          a: cos * scaleX,
+          b: -sin * scaleY,
+          c: sin * scaleX,
+          d: cos * scaleY
+        };
+      }
+
+      function applyLocal(local, x, y) {
+        return {
+          x: local.a * x + local.b * y + local.x,
+          y: local.c * x + local.d * y + local.y
+        };
+      }
+
+      function transformPoint(matrix, point) {
+        return {
+          x: matrix.a * point.x + matrix.b * point.y + matrix.worldX,
+          y: matrix.c * point.x + matrix.d * point.y + matrix.worldY
+        };
+      }
+
+      function rectCorners(center, width, height, rotation) {
+        var rad = rotation * DEG;
+        var ux = { x: Math.cos(rad) * width / 2, y: Math.sin(rad) * width / 2 };
+        var vy = { x: -Math.sin(rad) * height / 2, y: Math.cos(rad) * height / 2 };
+        return [
+          { x: center.x - ux.x - vy.x, y: center.y - ux.y - vy.y },
+          { x: center.x + ux.x - vy.x, y: center.y + ux.y - vy.y },
+          { x: center.x + ux.x + vy.x, y: center.y + ux.y + vy.y },
+          { x: center.x - ux.x + vy.x, y: center.y - ux.y + vy.y }
+        ];
+      }
+
+      function collectBounds(layers) {
+        var all = [];
+        layers.forEach(function (layer) {
+          all = all.concat(layer.corners || []);
+        });
+        return pointsBounds(all);
+      }
+
+      function pointsBounds(points) {
+        var minX = Infinity;
+        var minY = Infinity;
+        var maxX = -Infinity;
+        var maxY = -Infinity;
+        points.forEach(function (point) {
+          minX = Math.min(minX, point.x);
+          minY = Math.min(minY, point.y);
+          maxX = Math.max(maxX, point.x);
+          maxY = Math.max(maxY, point.y);
+        });
+        if (!isFinite(minX)) {
+          return { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+        }
+        return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+      }
+
+      function normalizeSkins(skins) {
+        if (Array.isArray(skins)) {
+          return skins.map(function (skin) {
+            return {
+              name: skin.name || "skin",
+              attachments: skin.attachments || skin
+            };
+          });
+        }
+        return Object.keys(skins).map(function (name) {
+          return {
+            name: name,
+            attachments: skins[name]
+          };
+        });
+      }
+
+      function findAttachment(skins, slotName, attachmentName) {
+        var ordered = skins.slice().sort(function (a, b) {
+          if (a.name === "default") return -1;
+          if (b.name === "default") return 1;
+          return 0;
+        });
+        for (var i = 0; i < ordered.length; i++) {
+          var slotAttachments = ordered[i].attachments && ordered[i].attachments[slotName];
+          if (slotAttachments && slotAttachments[attachmentName]) {
+            return { skin: ordered[i].name, attachment: slotAttachments[attachmentName] };
+          }
+        }
+        return null;
+      }
+
+      function buildJsx(manifest) {
+        var compact = {
+          name: manifest.name,
+          width: manifest.width,
+          height: manifest.height,
+          layers: manifest.layers
+        };
+        return [
+          "#target photoshop",
+          "",
+          "(function () {",
+          "  var manifest = " + JSON.stringify(compact, null, 2).replace(/\n/g, "\n  ") + ";",
+          "  var oldUnits = app.preferences.rulerUnits;",
+          "  app.preferences.rulerUnits = Units.PIXELS;",
+          "  app.displayDialogs = DialogModes.NO;",
+          "",
+          "  var imageFolder = Folder.selectDialog(\"Select the Spine images folder\");",
+          "  if (!imageFolder) {",
+          "    app.preferences.rulerUnits = oldUnits;",
+          "    return;",
+          "  }",
+          "",
+          "  var fileMap = {};",
+          "  indexFolder(imageFolder, fileMap, 0);",
+          "",
+          "  var doc = app.documents.add(manifest.width, manifest.height, 72, manifest.name, NewDocumentMode.RGB, DocumentFill.TRANSPARENT);",
+          "  var missing = [];",
+          "  var failed = [];",
+          "",
+          "  for (var i = 0; i < manifest.layers.length; i++) {",
+          "    try {",
+          "      placeLayer(doc, manifest.layers[i], imageFolder, fileMap, missing);",
+          "    } catch (layerError) {",
+          "      failed.push(manifest.layers[i].name + \": \" + layerError);",
+          "    }",
+          "  }",
+          "",
+          "  app.activeDocument = doc;",
+          "  app.preferences.rulerUnits = oldUnits;",
+          "  if (missing.length || failed.length) {",
+          "    var report = [];",
+          "    if (missing.length) report.push(\"Missing images:\\n\" + missing.slice(0, 20).join(\"\\n\") + (missing.length > 20 ? \"\\n...\" : \"\"));",
+          "    if (failed.length) report.push(\"Skipped failed layers:\\n\" + failed.slice(0, 20).join(\"\\n\") + (failed.length > 20 ? \"\\n...\" : \"\"));",
+          "    alert(\"Finished with warnings:\\n\\n\" + report.join(\"\\n\\n\"));",
+          "  } else {",
+          "    alert(\"Finished: \" + manifest.layers.length + \" layers\");",
+          "  }",
+          "",
+          "  function placeLayer(doc, layerInfo, imageFolder, fileMap, missing) {",
+          "    var file = findImage(imageFolder, fileMap, layerInfo.image);",
+          "    if (!file || !file.exists) {",
+          "      missing.push(layerInfo.image);",
+          "      return;",
+          "    }",
+          "",
+          "    var source = app.open(file);",
+          "    var sourceLayer = source.activeLayer;",
+          "    try { sourceLayer.name = layerInfo.name; } catch (sourceNameError) {}",
+          "    var duplicated = sourceLayer.duplicate(doc, ElementPlacement.PLACEATBEGINNING);",
+          "    source.close(SaveOptions.DONOTSAVECHANGES);",
+          "",
+          "    app.activeDocument = doc;",
+          "    doc.activeLayer = duplicated;",
+          "    duplicated.name = layerInfo.name;",
+          "    try { duplicated.opacity = layerInfo.opacity; } catch (opacityError) {}",
+          "",
+          "    var bounds = layerBounds(duplicated);",
+          "    if (bounds.empty) return;",
+          "    var currentWidth = Math.max(1, bounds.right - bounds.left);",
+          "    var currentHeight = Math.max(1, bounds.bottom - bounds.top);",
+          "    var scaleX = layerInfo.width / currentWidth * 100;",
+          "    var scaleY = layerInfo.height / currentHeight * 100;",
+          "    if (isFinite(scaleX) && isFinite(scaleY) && scaleX > 0 && scaleY > 0) {",
+          "      duplicated.resize(scaleX, scaleY, AnchorPosition.MIDDLECENTER);",
+          "    }",
+          "    if (Math.abs(layerInfo.rotation) > 0.001) {",
+          "      duplicated.rotate(layerInfo.rotation, AnchorPosition.MIDDLECENTER);",
+          "    }",
+          "",
+          "    var center = layerCenter(duplicated);",
+          "    duplicated.translate(UnitValue(layerInfo.x - center.x, \"px\"), UnitValue(layerInfo.y - center.y, \"px\"));",
+          "  }",
+          "",
+          "  function layerBounds(layer) {",
+          "    var b = layer.bounds;",
+          "    var left = b[0].as(\"px\");",
+          "    var top = b[1].as(\"px\");",
+          "    var right = b[2].as(\"px\");",
+          "    var bottom = b[3].as(\"px\");",
+          "    return {",
+          "      left: left,",
+          "      top: top,",
+          "      right: right,",
+          "      bottom: bottom,",
+          "      empty: right <= left || bottom <= top",
+          "    };",
+          "  }",
+          "",
+          "  function layerCenter(layer) {",
+          "    var b = layerBounds(layer);",
+          "    return {",
+          "      x: (b.left + b.right) / 2,",
+          "      y: (b.top + b.bottom) / 2",
+          "    };",
+          "  }",
+          "",
+          "  function findImage(folder, fileMap, imageName) {",
+          "    var rel = String(imageName).replace(/\\\\/g, \"/\");",
+          "    var direct = new File(folder.fsName + \"/\" + rel);",
+          "    if (direct.exists) return direct;",
+          "    direct = new File(folder.fsName + \"/\" + rel + \".png\");",
+          "    if (direct.exists) return direct;",
+          "    direct = new File(folder.fsName + \"/\" + rel + \".PNG\");",
+          "    if (direct.exists) return direct;",
+          "    var base = rel.substring(rel.lastIndexOf(\"/\") + 1).toLowerCase().replace(/\\.[^.]+$/, \"\");",
+          "    return fileMap[base] || null;",
+          "  }",
+          "",
+          "  function indexFolder(folder, map, depth) {",
+          "    if (depth > 8) return;",
+          "    var items = folder.getFiles();",
+          "    for (var i = 0; i < items.length; i++) {",
+          "      var item = items[i];",
+          "      if (item instanceof Folder) {",
+          "        indexFolder(item, map, depth + 1);",
+          "      } else {",
+          "        var lower = decodeURI(item.name).toLowerCase();",
+          "        if (/\\.(png|jpg|jpeg|tif|tiff)$/.test(lower)) {",
+          "          var base = lower.replace(/\\.[^.]+$/, \"\");",
+          "          if (!map[base]) map[base] = item;",
+          "        }",
+          "      }",
+          "    }",
+          "  }",
+          "}());",
+          ""
+        ].join("\n");
+      }
+
+      function renderStats(manifest) {
+        if (!manifest) {
+          stats.innerHTML = "";
+          return;
+        }
+        var items = [
+          ["图层", manifest.stats.layers],
+          ["Slots", manifest.stats.slots],
+          ["Mesh", manifest.stats.meshes],
+          ["Region", manifest.stats.regions],
+          ["画布", manifest.width + " x " + manifest.height],
+          ["跳过", manifest.stats.skipped]
+        ];
+        stats.innerHTML = items.map(function (item) {
+          return '<div class="stat"><div class="stat-value">' + escapeHtml(String(item[1])) + '</div><div class="stat-label">' + escapeHtml(item[0]) + '</div></div>';
+        }).join("");
+      }
+
+      function renderMessages(items, append) {
+        var existing = append ? messages.innerHTML : "";
+        var html = (items || []).map(function (item) {
+          return '<div class="message ' + escapeHtml(item.type || "") + '">' + escapeHtml(item.text) + '</div>';
+        }).join("");
+        messages.innerHTML = existing + html;
+      }
+
+      function renderLayerRows(layers) {
+        if (!layers || !layers.length) {
+          layerRows.innerHTML = '<tr><td colspan="8">等待 JSON</td></tr>';
+          return;
+        }
+        layerRows.innerHTML = layers.slice().reverse().map(function (layer) {
+          return [
+            "<tr>",
+            "<td>", layer.order, "</td>",
+            '<td class="name" title="', escapeHtml(layer.name), '">', escapeHtml(layer.name), "</td>",
+            "<td>", escapeHtml(layer.type), "</td>",
+            "<td>", layer.x, "</td>",
+            "<td>", layer.y, "</td>",
+            "<td>", layer.width, "</td>",
+            "<td>", layer.height, "</td>",
+            "<td>", layer.rotation, "</td>",
+            "</tr>"
+          ].join("");
+        }).join("");
+      }
+
+      function parseAlpha(color) {
+        if (!color || typeof color !== "string") return 1;
+        var cleaned = color.replace(/^#/, "");
+        if (cleaned.length < 8) return 1;
+        var alpha = parseInt(cleaned.slice(6, 8), 16);
+        return isNaN(alpha) ? 1 : alpha / 255;
+      }
+
+      function averagePoints(points) {
+        var sumX = 0;
+        var sumY = 0;
+        points.forEach(function (point) {
+          sumX += point.x;
+          sumY += point.y;
+        });
+        return { x: sumX / points.length, y: sumY / points.length };
+      }
+
+      function sub(a, b) {
+        return { x: a.x - b.x, y: a.y - b.y };
+      }
+
+      function length(vector) {
+        return Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+      }
+
+      function numberOr(value, fallback) {
+        var n = Number(value);
+        return isFinite(n) ? n : fallback;
+      }
+
+      function round(value, digits) {
+        var factor = Math.pow(10, digits || 0);
+        return Math.round(value * factor) / factor;
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function pad4(value) {
+        return String(value).padStart(4, "0");
+      }
+
+      function stripKnownImageExtension(value) {
+        return String(value).replace(/\.(png|jpg|jpeg|tif|tiff)$/i, "");
+      }
+
+      function imageLayerName(value) {
+        var normalized = stripKnownImageExtension(value).replace(/\\/g, "/");
+        var slash = normalized.lastIndexOf("/");
+        return slash >= 0 ? normalized.slice(slash + 1) : normalized;
+      }
+
+      function safeFileBase(value) {
+        return String(value || "spine_rebuild")
+          .replace(/\.[^.]+$/g, "")
+          .replace(/[\\/:*?"<>|]+/g, "_")
+          .trim() || "spine_rebuild";
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (char) {
+          return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+          }[char];
+        });
+      }
+
+      window.SpineJsonToPhotoshopJsx = {
+        buildManifest: buildManifest,
+        buildJsx: buildJsx
+      };
+    }());
+  </script>
+</body>
+</html>

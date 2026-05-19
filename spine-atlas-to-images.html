@@ -1,0 +1,1391 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spine Atlas 切图工具</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f6f8;
+      --panel: #ffffff;
+      --ink: #1d2733;
+      --muted: #667085;
+      --line: #d8dee7;
+      --accent: #256f5c;
+      --accent-strong: #1b5748;
+      --ok: #287a45;
+      --warn: #ad6b00;
+      --bad: #b42318;
+      --shadow: 0 16px 40px rgba(17, 24, 39, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0;
+      display: grid;
+      grid-template-columns: minmax(320px, 410px) minmax(0, 1fr);
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .side,
+    .main {
+      padding: 18px;
+    }
+
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .main {
+      min-height: calc(100vh - 48px);
+      display: grid;
+      grid-template-rows: auto auto minmax(260px, 1fr);
+      gap: 14px;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    h2 {
+      font-size: 16px;
+      line-height: 1.25;
+    }
+
+    .subtle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .drop {
+      position: relative;
+      min-height: 150px;
+      border: 1px dashed #98a7b8;
+      border-radius: 8px;
+      background: #fbfcfe;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      cursor: pointer;
+      transition: border-color 140ms ease, background 140ms ease;
+    }
+
+    .drop.is-dragging {
+      border-color: var(--accent);
+      background: #edf8f3;
+    }
+
+    .drop input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .drop-text {
+      pointer-events: none;
+      text-align: center;
+    }
+
+    .drop-title {
+      display: block;
+      font-size: 18px;
+      font-weight: 750;
+    }
+
+    .drop-note {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .file-picker {
+      display: grid;
+      gap: 8px;
+    }
+
+    .file-picker.file-drop {
+      border: 1px dashed transparent;
+      border-radius: 8px;
+      padding: 10px;
+      margin: -10px;
+      transition: border-color 140ms ease, background 140ms ease;
+    }
+
+    .file-picker.file-drop.is-dragging {
+      border-color: var(--accent);
+      background: #edf8f3;
+    }
+
+    .file-picker label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .file-picker input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      background: #fff;
+    }
+
+    .option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--ink);
+      font-size: 14px;
+    }
+
+    .option input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      min-height: 38px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    button:not(:disabled):hover {
+      background: var(--accent-strong);
+    }
+
+    button.secondary:not(:disabled):hover {
+      background: #f5f7fa;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .stat {
+      min-height: 68px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px;
+      background: #fbfcfe;
+    }
+
+    .stat-value {
+      color: var(--ink);
+      font-size: 21px;
+      font-weight: 800;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+
+    .stat-label {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .messages {
+      display: grid;
+      gap: 8px;
+    }
+
+    .message {
+      border-radius: 6px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      background: #fbfcfe;
+      color: var(--muted);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .message.ok {
+      color: var(--ok);
+      border-color: #b8dec6;
+      background: #f0fbf4;
+    }
+
+    .message.warn {
+      color: var(--warn);
+      border-color: #f1cf8b;
+      background: #fff8ea;
+    }
+
+    .message.bad {
+      color: var(--bad);
+      border-color: #f3b8b3;
+      background: #fff1f0;
+    }
+
+    .preview {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+      gap: 10px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .tile {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      min-height: 138px;
+      padding: 8px;
+      display: grid;
+      grid-template-rows: 88px auto;
+      gap: 7px;
+    }
+
+    .thumb {
+      border-radius: 6px;
+      background:
+        linear-gradient(45deg, #e7ebf0 25%, transparent 25%),
+        linear-gradient(-45deg, #e7ebf0 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #e7ebf0 75%),
+        linear-gradient(-45deg, transparent 75%, #e7ebf0 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .thumb img {
+      max-width: 100%;
+      max-height: 100%;
+      image-rendering: auto;
+    }
+
+    .tile-name {
+      min-width: 0;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tile-meta {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .table-wrap {
+      max-height: 250px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th,
+    td {
+      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+      text-align: left;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f8fafc;
+      color: var(--muted);
+    }
+
+    td.name {
+      max-width: 250px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .main {
+        min-height: 650px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="panel side">
+      <div>
+        <h1>Spine Atlas 切图工具</h1>
+        <p class="subtle">拖入 .atlas，选择合图 PNG，导出 images.zip</p>
+      </div>
+
+      <label id="dropZone" class="drop">
+        <input id="atlasInput" type="file" accept=".atlas,text/plain">
+        <span class="drop-text">
+          <span class="drop-title">拖入 .atlas</span>
+          <span id="atlasName" class="drop-note">或点击选择 atlas 文件</span>
+        </span>
+      </label>
+
+      <div id="pngDropZone" class="file-picker file-drop">
+        <label for="pngInput">选择合图 PNG</label>
+        <input id="pngInput" type="file" accept="image/png" multiple>
+        <p id="pngName" class="subtle">支持选择或拖入一张/多张 page PNG</p>
+      </div>
+
+      <div class="file-picker">
+        <label for="jsonInput">可选：选择 Spine JSON</label>
+        <input id="jsonInput" type="file" accept=".json,application/json">
+        <p id="jsonName" class="subtle">用于按附件 UV 导出更细的切图</p>
+      </div>
+
+      <label class="option">
+        <input id="restoreOrig" type="checkbox" checked>
+        <span>按 orig / offset 还原透明画布</span>
+      </label>
+
+      <label class="option">
+        <input id="useJsonAttachments" type="checkbox" checked>
+        <span>有 JSON 时按附件 / UV 导出</span>
+      </label>
+
+      <div class="button-row">
+        <button id="sliceButton" type="button" disabled>生成切图</button>
+        <button id="downloadButton" class="secondary" type="button" disabled>下载 images.zip</button>
+      </div>
+
+      <div id="stats" class="stats"></div>
+      <div id="messages" class="messages"></div>
+    </section>
+
+    <section class="panel main">
+      <div>
+        <h2>切图预览</h2>
+        <p class="subtle">预览只显示前 80 张，ZIP 会包含全部切图</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>名称</th>
+              <th>Page</th>
+              <th>尺寸</th>
+              <th>Orig / Type</th>
+              <th>Rotate</th>
+            </tr>
+          </thead>
+          <tbody id="regionRows">
+            <tr><td colspan="6">等待 atlas</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="preview" class="preview"></div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var state = {
+        atlasFile: null,
+        atlasText: "",
+        atlas: null,
+        jsonFile: null,
+        json: null,
+        jsonAttachments: [],
+        pngFiles: [],
+        images: {},
+        outputs: [],
+        zipBlob: null
+      };
+
+      var dropZone = document.getElementById("dropZone");
+      var atlasInput = document.getElementById("atlasInput");
+      var pngDropZone = document.getElementById("pngDropZone");
+      var pngInput = document.getElementById("pngInput");
+      var jsonInput = document.getElementById("jsonInput");
+      var atlasName = document.getElementById("atlasName");
+      var pngName = document.getElementById("pngName");
+      var jsonName = document.getElementById("jsonName");
+      var restoreOrig = document.getElementById("restoreOrig");
+      var useJsonAttachments = document.getElementById("useJsonAttachments");
+      var sliceButton = document.getElementById("sliceButton");
+      var downloadButton = document.getElementById("downloadButton");
+      var stats = document.getElementById("stats");
+      var messages = document.getElementById("messages");
+      var preview = document.getElementById("preview");
+      var regionRows = document.getElementById("regionRows");
+
+      atlasInput.addEventListener("change", function () {
+        if (atlasInput.files && atlasInput.files[0]) readAtlas(atlasInput.files[0]);
+      });
+
+      pngInput.addEventListener("change", async function () {
+        await setPngFiles(pngInput.files || []);
+      });
+
+      jsonInput.addEventListener("change", async function () {
+        if (jsonInput.files && jsonInput.files[0]) await readJson(jsonInput.files[0]);
+      });
+
+      restoreOrig.addEventListener("change", function () {
+        state.outputs = [];
+        state.zipBlob = null;
+        downloadButton.disabled = true;
+      });
+
+      useJsonAttachments.addEventListener("change", function () {
+        state.outputs = [];
+        state.zipBlob = null;
+        downloadButton.disabled = true;
+        renderAtlasInfo();
+      });
+
+      ["dragenter", "dragover"].forEach(function (eventName) {
+        dropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          dropZone.classList.add("is-dragging");
+        });
+      });
+
+      ["dragleave", "drop"].forEach(function (eventName) {
+        dropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          dropZone.classList.remove("is-dragging");
+        });
+      });
+
+      dropZone.addEventListener("drop", function (event) {
+        routeDroppedFiles(event.dataTransfer && event.dataTransfer.files, "atlas");
+      });
+
+      ["dragenter", "dragover"].forEach(function (eventName) {
+        pngDropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          pngDropZone.classList.add("is-dragging");
+        });
+      });
+
+      ["dragleave", "drop"].forEach(function (eventName) {
+        pngDropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          pngDropZone.classList.remove("is-dragging");
+        });
+      });
+
+      pngDropZone.addEventListener("drop", function (event) {
+        routeDroppedFiles(event.dataTransfer && event.dataTransfer.files, "png");
+      });
+
+      sliceButton.addEventListener("click", async function () {
+        await sliceAtlas();
+      });
+
+      downloadButton.addEventListener("click", function () {
+        if (!state.zipBlob) return;
+        var name = (state.atlasFile ? state.atlasFile.name.replace(/\.[^.]+$/, "") : "images") + "_images.zip";
+        downloadBlob(state.zipBlob, name);
+      });
+
+      async function routeDroppedFiles(fileList, preferredType) {
+        var files = Array.prototype.slice.call(fileList || []);
+        if (!files.length) return;
+
+        var atlas = files.find(isAtlasFile);
+        var json = files.find(isJsonFile);
+        var pngs = files.filter(isPngFile);
+
+        if (preferredType === "png") {
+          if (pngs.length) await setPngFiles(pngs);
+          if (atlas) await readAtlas(atlas);
+          if (json) await readJson(json);
+          if (!pngs.length && !atlas && !json) {
+            renderMessages([{ type: "warn", text: "没有识别到 PNG / atlas / JSON 文件。" }]);
+          }
+          return;
+        }
+
+        if (atlas) await readAtlas(atlas);
+        if (json) await readJson(json);
+        if (pngs.length) await setPngFiles(pngs);
+        if (!atlas && !json && !pngs.length) {
+          renderMessages([{ type: "warn", text: "没有识别到 PNG / atlas / JSON 文件。" }]);
+        }
+      }
+
+      async function setPngFiles(fileList) {
+        state.pngFiles = Array.prototype.slice.call(fileList || []).filter(isPngFile);
+        pngName.textContent = state.pngFiles.length ? state.pngFiles.map(function (file) { return file.name; }).join("，") : "支持选择或拖入一张/多张 page PNG";
+        state.outputs = [];
+        state.zipBlob = null;
+        downloadButton.disabled = true;
+        if (!state.pngFiles.length) {
+          state.images = {};
+          renderMessages([{ type: "warn", text: "没有识别到 PNG 文件。" }]);
+          updateReadyState();
+          return;
+        }
+        await loadPngFiles();
+        updateReadyState();
+      }
+
+      function isPngFile(file) {
+        return !!file && (/\.png$/i.test(file.name || "") || file.type === "image/png");
+      }
+
+      function isAtlasFile(file) {
+        return !!file && /\.atlas$/i.test(file.name || "");
+      }
+
+      function isJsonFile(file) {
+        return !!file && (/\.json$/i.test(file.name || "") || file.type === "application/json");
+      }
+
+      async function readAtlas(file) {
+        try {
+          state.atlasFile = file;
+          state.atlasText = await file.text();
+          state.atlas = parseAtlas(state.atlasText);
+          atlasName.textContent = file.name;
+          state.outputs = [];
+          state.zipBlob = null;
+          downloadButton.disabled = true;
+          renderAtlasInfo();
+          renderMessages([{ type: "ok", text: "已读取 atlas：" + state.atlas.regions.length + " 个区域，" + state.atlas.pages.length + " 张 page。" }]);
+          updateReadyState();
+        } catch (error) {
+          state.atlas = null;
+          state.outputs = [];
+          state.zipBlob = null;
+          renderRows([]);
+          renderStats(null);
+          renderMessages([{ type: "bad", text: "Atlas 解析失败：" + error.message }]);
+          updateReadyState();
+        }
+      }
+
+      async function readJson(file) {
+        try {
+          state.jsonFile = file;
+          state.json = JSON.parse(await file.text());
+          state.jsonAttachments = parseSpineJsonAttachments(state.json);
+          jsonName.textContent = file.name;
+          state.outputs = [];
+          state.zipBlob = null;
+          downloadButton.disabled = true;
+          renderAtlasInfo();
+          var partialCount = state.jsonAttachments.filter(function (item) {
+            return item.crop && (item.crop.u > 0.0001 || item.crop.v > 0.0001 || item.crop.u2 < 0.9999 || item.crop.v2 < 0.9999);
+          }).length;
+          renderMessages([{ type: "ok", text: "已读取 JSON：" + state.jsonAttachments.length + " 个图片附件，其中 " + partialCount + " 个使用局部 UV。" }]);
+          updateReadyState();
+        } catch (error) {
+          state.jsonFile = null;
+          state.json = null;
+          state.jsonAttachments = [];
+          jsonName.textContent = "用于按附件 UV 导出更细的切图";
+          renderMessages([{ type: "bad", text: "JSON 解析失败：" + error.message }]);
+          updateReadyState();
+        }
+      }
+
+      async function loadPngFiles() {
+        state.images = {};
+        for (var i = 0; i < state.pngFiles.length; i++) {
+          var file = state.pngFiles[i];
+          var image = await loadImageFromFile(file);
+          var lower = file.name.toLowerCase();
+          state.images[lower] = { file: file, image: image };
+          state.images[stripExtension(lower)] = { file: file, image: image };
+        }
+        state.outputs = [];
+        state.zipBlob = null;
+        downloadButton.disabled = true;
+        if (state.pngFiles.length) {
+          renderMessages([{ type: "ok", text: "已载入 " + state.pngFiles.length + " 张 PNG。" }]);
+        }
+      }
+
+      async function sliceAtlas() {
+        if (!state.atlas || !state.pngFiles.length) return;
+        sliceButton.disabled = true;
+        downloadButton.disabled = true;
+        renderMessages([{ type: "ok", text: "正在切图..." }]);
+
+        try {
+          var outputs = [];
+          var missingPages = [];
+          var jobs = buildExportJobs();
+          if (!jobs.length && isJsonMode()) {
+            throw new Error("JSON 附件没有匹配到 atlas region。可以关闭“按附件 / UV 导出”先按 atlas 原始区域导出。");
+          }
+          for (var i = 0; i < jobs.length; i++) {
+            var job = jobs[i];
+            var region = job.region;
+            var pageImage = findPageImage(region.page);
+            if (!pageImage) {
+              if (missingPages.indexOf(region.page.name) === -1) missingPages.push(region.page.name);
+              continue;
+            }
+            var canvas = drawJob(pageImage.image, job, restoreOrig.checked);
+            var blob = await canvasToBlob(canvas);
+            outputs.push({
+              name: uniqueOutputName(outputs, "images/" + safeName(job.outputName) + ".png"),
+              job: job,
+              region: region,
+              width: canvas.width,
+              height: canvas.height,
+              blob: blob,
+              url: URL.createObjectURL(blob)
+            });
+          }
+
+          if (!outputs.length) {
+            throw new Error("没有生成切图。请确认 PNG 是否是 atlas 对应的合图。");
+          }
+
+          state.outputs.forEach(function (item) {
+            if (item.url) URL.revokeObjectURL(item.url);
+          });
+          state.outputs = outputs;
+          state.zipBlob = await createZip(outputs.map(function (item) {
+            return { name: item.name, blob: item.blob };
+          }));
+
+          renderPreview(outputs);
+          renderStats({
+            pages: state.atlas.pages.length,
+            regions: state.atlas.regions.length,
+            jobs: jobs.length,
+            outputs: outputs.length,
+            rotated: state.atlas.regions.filter(function (region) { return region.rotate; }).length,
+            zipSize: state.zipBlob.size
+          });
+
+          var modeText = isJsonMode() ? "JSON 附件 / UV 模式" : "Atlas region 模式";
+          var doneMessages = [{ type: "ok", text: "已生成 " + outputs.length + " 张切图（" + modeText + "），可以下载 images.zip。" }];
+          if (missingPages.length) {
+            doneMessages.push({ type: "warn", text: "缺少 page PNG：" + missingPages.join("，") });
+          }
+          renderMessages(doneMessages);
+          downloadButton.disabled = false;
+        } catch (error) {
+          renderMessages([{ type: "bad", text: error.message }]);
+        } finally {
+          updateReadyState();
+        }
+      }
+
+      function buildExportJobs() {
+        if (!isJsonMode()) {
+          return state.atlas.regions.map(function (region) {
+            return {
+              mode: "atlas",
+              outputName: region.name,
+              region: region,
+              crop: null,
+              attachment: null
+            };
+          });
+        }
+
+        var atlasByName = {};
+        state.atlas.regions.forEach(function (region) {
+          atlasByName[normalizeKey(region.name)] = region;
+        });
+
+        var jobs = [];
+        state.jsonAttachments.forEach(function (attachment) {
+          var region = atlasByName[normalizeKey(attachment.imageName)];
+          if (!region) return;
+          jobs.push({
+            mode: "json",
+            outputName: attachment.slotName || attachment.attachmentName || attachment.imageName,
+            region: region,
+            crop: attachment.crop,
+            attachment: attachment
+          });
+        });
+        return jobs;
+      }
+
+      function isJsonMode() {
+        return !!(state.atlas && state.json && useJsonAttachments.checked && state.jsonAttachments.length);
+      }
+
+      function drawJob(pageImage, job, restore) {
+        var region = job.region;
+        var trimmed = drawUprightRegion(pageImage, region);
+        var cropInfo = resolveUvCrop(job.crop, region);
+
+        if (cropInfo && !isFullCrop(cropInfo, region)) {
+          var crop = clampCrop(cropInfo, trimmed.width, trimmed.height);
+          var cropped = document.createElement("canvas");
+          cropped.width = Math.max(1, crop.width);
+          cropped.height = Math.max(1, crop.height);
+          var cropCtx = cropped.getContext("2d");
+          cropCtx.imageSmoothingEnabled = false;
+          cropCtx.drawImage(trimmed, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height);
+          return cropped;
+        }
+
+        if (!restore) return trimmed;
+
+        var out = document.createElement("canvas");
+        out.width = Math.max(1, region.origWidth || region.width);
+        out.height = Math.max(1, region.origHeight || region.height);
+        var outCtx = out.getContext("2d");
+        outCtx.imageSmoothingEnabled = false;
+        var dx = region.offsetX || 0;
+        var dy = out.height - (region.offsetY || 0) - region.height;
+        outCtx.drawImage(trimmed, dx, dy);
+        return out;
+      }
+
+      function drawUprightRegion(pageImage, region) {
+        var sx = region.x;
+        var sy = region.y;
+        var width = region.width;
+        var height = region.height;
+        var packedWidth = region.rotate ? height : width;
+        var packedHeight = region.rotate ? width : height;
+
+        var trimmed = document.createElement("canvas");
+        trimmed.width = Math.max(1, width);
+        trimmed.height = Math.max(1, height);
+        var trimmedCtx = trimmed.getContext("2d");
+        trimmedCtx.imageSmoothingEnabled = false;
+
+        if (region.rotate) {
+          trimmedCtx.translate(width, 0);
+          trimmedCtx.rotate(Math.PI / 2);
+          trimmedCtx.drawImage(pageImage, sx, sy, packedWidth, packedHeight, 0, 0, packedWidth, packedHeight);
+        } else {
+          trimmedCtx.drawImage(pageImage, sx, sy, packedWidth, packedHeight, 0, 0, width, height);
+        }
+
+        return trimmed;
+      }
+
+      function drawRegion(pageImage, region, restore) {
+        return drawJob(pageImage, { region: region, crop: null }, restore);
+      }
+
+      function isFullCrop(crop, region) {
+        return crop.x <= 0 && crop.y <= 0 && crop.width >= region.width && crop.height >= region.height;
+      }
+
+      function clampCrop(crop, width, height) {
+        var x = Math.max(0, Math.min(width - 1, Math.floor(crop.x)));
+        var y = Math.max(0, Math.min(height - 1, Math.floor(crop.y)));
+        var right = Math.max(x + 1, Math.min(width, Math.ceil(crop.x + crop.width)));
+        var bottom = Math.max(y + 1, Math.min(height, Math.ceil(crop.y + crop.height)));
+        return {
+          x: x,
+          y: y,
+          width: right - x,
+          height: bottom - y
+        };
+      }
+
+      function parseSpineJsonAttachments(spine) {
+        if (!spine || !spine.skins) throw new Error("不是可识别的 Spine JSON：缺少 skins。");
+        var skins = normalizeSkins(spine.skins);
+        var attachments = [];
+        skins.forEach(function (skin) {
+          Object.keys(skin.attachments || {}).forEach(function (slotName) {
+            var slotAttachments = skin.attachments[slotName] || {};
+            Object.keys(slotAttachments).forEach(function (attachmentName) {
+              var attachment = slotAttachments[attachmentName] || {};
+              var type = attachment.type || "region";
+              if (type === "clipping" || type === "boundingbox" || type === "path" || type === "point") return;
+              attachments.push({
+                skinName: skin.name,
+                slotName: slotName,
+                attachmentName: attachmentName,
+                imageName: attachment.path || attachmentName,
+                type: type,
+                crop: cropFromAttachmentUvs(attachment)
+              });
+            });
+          });
+        });
+        return attachments;
+      }
+
+      function normalizeSkins(skins) {
+        if (Array.isArray(skins)) {
+          return skins.map(function (skin) {
+            return {
+              name: skin.name || "skin",
+              attachments: skin.attachments || skin
+            };
+          });
+        }
+        return Object.keys(skins).map(function (name) {
+          return {
+            name: name,
+            attachments: skins[name]
+          };
+        });
+      }
+
+      function cropFromAttachmentUvs(attachment) {
+        var uvs = attachment.uvs;
+        if (!uvs || uvs.length < 4) return null;
+        var minU = Infinity;
+        var minV = Infinity;
+        var maxU = -Infinity;
+        var maxV = -Infinity;
+        for (var i = 0; i < uvs.length; i += 2) {
+          minU = Math.min(minU, uvs[i]);
+          maxU = Math.max(maxU, uvs[i]);
+          minV = Math.min(minV, uvs[i + 1]);
+          maxV = Math.max(maxV, uvs[i + 1]);
+        }
+        if (!isFinite(minU) || !isFinite(minV)) return null;
+        return {
+          u: clamp01(minU),
+          v: clamp01(minV),
+          u2: clamp01(maxU),
+          v2: clamp01(maxV),
+          uv: true
+        };
+      }
+
+      function resolveUvCrop(crop, region) {
+        if (!crop || !crop.uv) return crop;
+        return {
+          x: crop.u * region.width,
+          y: crop.v * region.height,
+          width: Math.max(1, (crop.u2 - crop.u) * region.width),
+          height: Math.max(1, (crop.v2 - crop.v) * region.height)
+        };
+      }
+
+      function clamp01(value) {
+        return Math.max(0, Math.min(1, Number(value) || 0));
+      }
+
+      function findPageImage(page) {
+        if (!page) return null;
+        var byName = state.images[page.name.toLowerCase()] || state.images[stripExtension(page.name.toLowerCase())];
+        if (byName) return byName;
+        if (state.pngFiles.length === 1) {
+          var only = state.pngFiles[0].name.toLowerCase();
+          return state.images[only] || state.images[stripExtension(only)];
+        }
+        return null;
+      }
+
+      function parseAtlas(text) {
+        var rawLines = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/);
+        var lines = rawLines.map(function (raw) {
+          return { raw: raw, text: raw.trim() };
+        });
+        var pages = [];
+        var regions = [];
+        var currentPage = null;
+        var currentRegion = null;
+        var afterBlank = true;
+
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].text;
+          if (!line) {
+            afterBlank = true;
+            currentRegion = null;
+            continue;
+          }
+
+          var colon = line.indexOf(":");
+          if (colon < 0) {
+            if (!currentPage || (afterBlank && nextLooksLikePage(lines, i + 1))) {
+              currentPage = {
+                name: line,
+                width: 0,
+                height: 0,
+                regions: []
+              };
+              pages.push(currentPage);
+              currentRegion = null;
+            } else {
+              currentRegion = {
+                name: line,
+                page: currentPage,
+                rotate: false,
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+                origWidth: 0,
+                origHeight: 0,
+                offsetX: 0,
+                offsetY: 0,
+                index: -1
+              };
+              currentPage.regions.push(currentRegion);
+              regions.push(currentRegion);
+            }
+            afterBlank = false;
+            continue;
+          }
+
+          var key = line.slice(0, colon).trim();
+          var value = line.slice(colon + 1).trim();
+          if (currentRegion) {
+            setRegionProperty(currentRegion, key, value);
+          } else if (currentPage) {
+            setPageProperty(currentPage, key, value);
+          }
+          afterBlank = false;
+        }
+
+        regions.forEach(function (region) {
+          if (!region.origWidth) region.origWidth = region.width;
+          if (!region.origHeight) region.origHeight = region.height;
+        });
+
+        if (!pages.length) throw new Error("没有找到 page。");
+        if (!regions.length) throw new Error("没有找到 region。");
+        return { pages: pages, regions: regions };
+      }
+
+      function nextLooksLikePage(lines, start) {
+        for (var i = start; i < lines.length; i++) {
+          var line = lines[i].text;
+          if (!line) continue;
+          var colon = line.indexOf(":");
+          if (colon < 0) return false;
+          var key = line.slice(0, colon).trim().toLowerCase();
+          return key === "size" || key === "format" || key === "filter" || key === "repeat" || key === "pma";
+        }
+        return false;
+      }
+
+      function setPageProperty(page, key, value) {
+        var lower = key.toLowerCase();
+        if (lower === "size") {
+          var size = readNumbers(value);
+          page.width = size[0] || 0;
+          page.height = size[1] || 0;
+        } else {
+          page[lower] = value;
+        }
+      }
+
+      function setRegionProperty(region, key, value) {
+        var lower = key.toLowerCase();
+        var nums = readNumbers(value);
+        if (lower === "rotate") {
+          region.rotate = value === "true" || value === "90";
+        } else if (lower === "xy") {
+          region.x = nums[0] || 0;
+          region.y = nums[1] || 0;
+        } else if (lower === "size") {
+          region.width = nums[0] || 0;
+          region.height = nums[1] || 0;
+        } else if (lower === "bounds") {
+          region.x = nums[0] || 0;
+          region.y = nums[1] || 0;
+          region.width = nums[2] || 0;
+          region.height = nums[3] || 0;
+        } else if (lower === "orig") {
+          region.origWidth = nums[0] || 0;
+          region.origHeight = nums[1] || 0;
+        } else if (lower === "offset") {
+          region.offsetX = nums[0] || 0;
+          region.offsetY = nums[1] || 0;
+        } else if (lower === "offsets") {
+          region.offsetX = nums[0] || 0;
+          region.offsetY = nums[1] || 0;
+          region.origWidth = nums[2] || region.origWidth;
+          region.origHeight = nums[3] || region.origHeight;
+        } else if (lower === "index") {
+          region.index = nums[0] == null ? -1 : nums[0];
+        } else {
+          region[lower] = value;
+        }
+      }
+
+      function readNumbers(value) {
+        return String(value).split(",").map(function (part) {
+          return Number(part.trim());
+        }).filter(function (value) {
+          return isFinite(value);
+        });
+      }
+
+      function renderAtlasInfo() {
+        if (!state.atlas) {
+          renderRows([]);
+          renderStats(null);
+          return;
+        }
+        if (isJsonMode()) {
+          renderJobRows(buildExportJobs());
+        } else {
+          renderRows(state.atlas.regions);
+        }
+        renderStats({
+          pages: state.atlas.pages.length,
+          regions: state.atlas.regions.length,
+          jobs: isJsonMode() ? buildExportJobs().length : state.atlas.regions.length,
+          outputs: state.outputs.length,
+          rotated: state.atlas.regions.filter(function (region) { return region.rotate; }).length,
+          zipSize: state.zipBlob ? state.zipBlob.size : 0
+        });
+      }
+
+      function renderRows(regions) {
+        if (!regions || !regions.length) {
+          regionRows.innerHTML = "<tr><td colspan=\"6\">等待 atlas</td></tr>";
+          return;
+        }
+        regionRows.innerHTML = regions.map(function (region, index) {
+          return [
+            "<tr>",
+            "<td>", index + 1, "</td>",
+            '<td class="name" title="', escapeHtml(region.name), '">', escapeHtml(region.name), "</td>",
+            '<td class="name" title="', escapeHtml(region.page.name), '">', escapeHtml(region.page.name), "</td>",
+            "<td>", region.width, " x ", region.height, "</td>",
+            "<td>", region.origWidth || region.width, " x ", region.origHeight || region.height, "</td>",
+            "<td>", region.rotate ? "true" : "false", "</td>",
+            "</tr>"
+          ].join("");
+        }).join("");
+      }
+
+      function renderJobRows(jobs) {
+        if (!jobs || !jobs.length) {
+          regionRows.innerHTML = "<tr><td colspan=\"6\">等待 JSON / atlas</td></tr>";
+          return;
+        }
+        regionRows.innerHTML = jobs.map(function (job, index) {
+          var crop = resolveUvCrop(job.crop, job.region);
+          var sizeText = crop ? Math.ceil(crop.width) + " x " + Math.ceil(crop.height) : job.region.width + " x " + job.region.height;
+          return [
+            "<tr>",
+            "<td>", index + 1, "</td>",
+            '<td class="name" title="', escapeHtml(job.outputName), '">', escapeHtml(job.outputName), "</td>",
+            '<td class="name" title="', escapeHtml(job.region.page.name), '">', escapeHtml(job.region.page.name), "</td>",
+            "<td>", sizeText, "</td>",
+            "<td>", escapeHtml(job.attachment ? job.attachment.type : "atlas"), "</td>",
+            "<td>", job.region.rotate ? "true" : "false", "</td>",
+            "</tr>"
+          ].join("");
+        }).join("");
+      }
+
+      function renderPreview(outputs) {
+        preview.innerHTML = outputs.slice(0, 80).map(function (item) {
+          var label = item.job ? item.job.outputName : item.region.name;
+          var meta = item.width + " x " + item.height + (item.job && item.job.mode === "json" ? " / JSON" : "");
+          return [
+            '<div class="tile">',
+            '<div class="thumb"><img alt="" src="', item.url, '"></div>',
+            '<div><div class="tile-name" title="', escapeHtml(label), '">', escapeHtml(label), '</div>',
+            '<div class="tile-meta">', escapeHtml(meta), '</div></div>',
+            '</div>'
+          ].join("");
+        }).join("");
+      }
+
+      function renderStats(data) {
+        if (!data) {
+          stats.innerHTML = "";
+          return;
+        }
+        var items = [
+          ["Pages", data.pages || 0],
+          ["Atlas Regions", data.regions || 0],
+          ["导出任务", data.jobs || data.regions || 0],
+          ["已切出", data.outputs || 0],
+          ["旋转区域", data.rotated || 0],
+          ["ZIP", data.zipSize ? formatBytes(data.zipSize) : "-"]
+        ];
+        stats.innerHTML = items.map(function (item) {
+          return '<div class="stat"><div class="stat-value">' + escapeHtml(String(item[1])) + '</div><div class="stat-label">' + escapeHtml(item[0]) + '</div></div>';
+        }).join("");
+      }
+
+      function renderMessages(items) {
+        messages.innerHTML = (items || []).map(function (item) {
+          return '<div class="message ' + escapeHtml(item.type || "") + '">' + escapeHtml(item.text) + '</div>';
+        }).join("");
+      }
+
+      function updateReadyState() {
+        sliceButton.disabled = !(state.atlas && state.pngFiles.length);
+        downloadButton.disabled = !state.zipBlob;
+      }
+
+      function loadImageFromFile(file) {
+        return new Promise(function (resolve, reject) {
+          var url = URL.createObjectURL(file);
+          var image = new Image();
+          image.onload = function () {
+            URL.revokeObjectURL(url);
+            resolve(image);
+          };
+          image.onerror = function () {
+            URL.revokeObjectURL(url);
+            reject(new Error("PNG 载入失败：" + file.name));
+          };
+          image.src = url;
+        });
+      }
+
+      function canvasToBlob(canvas) {
+        return new Promise(function (resolve, reject) {
+          canvas.toBlob(function (blob) {
+            if (blob) resolve(blob);
+            else reject(new Error("Canvas 导出 PNG 失败。"));
+          }, "image/png");
+        });
+      }
+
+      async function createZip(files) {
+        var localParts = [];
+        var centralParts = [];
+        var offset = 0;
+        var encoder = new TextEncoder();
+        var mod = dosDateTime(new Date());
+
+        for (var i = 0; i < files.length; i++) {
+          var file = files[i];
+          var data = new Uint8Array(await file.blob.arrayBuffer());
+          var nameBytes = encoder.encode(file.name);
+          var crc = crc32(data);
+
+          var local = new Uint8Array(30 + nameBytes.length);
+          var localView = new DataView(local.buffer);
+          localView.setUint32(0, 0x04034b50, true);
+          localView.setUint16(4, 20, true);
+          localView.setUint16(6, 0x0800, true);
+          localView.setUint16(8, 0, true);
+          localView.setUint16(10, mod.time, true);
+          localView.setUint16(12, mod.date, true);
+          localView.setUint32(14, crc, true);
+          localView.setUint32(18, data.length, true);
+          localView.setUint32(22, data.length, true);
+          localView.setUint16(26, nameBytes.length, true);
+          localView.setUint16(28, 0, true);
+          local.set(nameBytes, 30);
+          localParts.push(local, data);
+
+          var central = new Uint8Array(46 + nameBytes.length);
+          var centralView = new DataView(central.buffer);
+          centralView.setUint32(0, 0x02014b50, true);
+          centralView.setUint16(4, 20, true);
+          centralView.setUint16(6, 20, true);
+          centralView.setUint16(8, 0x0800, true);
+          centralView.setUint16(10, 0, true);
+          centralView.setUint16(12, mod.time, true);
+          centralView.setUint16(14, mod.date, true);
+          centralView.setUint32(16, crc, true);
+          centralView.setUint32(20, data.length, true);
+          centralView.setUint32(24, data.length, true);
+          centralView.setUint16(28, nameBytes.length, true);
+          centralView.setUint16(30, 0, true);
+          centralView.setUint16(32, 0, true);
+          centralView.setUint16(34, 0, true);
+          centralView.setUint16(36, 0, true);
+          centralView.setUint32(38, 0, true);
+          centralView.setUint32(42, offset, true);
+          central.set(nameBytes, 46);
+          centralParts.push(central);
+
+          offset += local.length + data.length;
+        }
+
+        var centralSize = centralParts.reduce(function (sum, part) { return sum + part.length; }, 0);
+        var end = new Uint8Array(22);
+        var endView = new DataView(end.buffer);
+        endView.setUint32(0, 0x06054b50, true);
+        endView.setUint16(4, 0, true);
+        endView.setUint16(6, 0, true);
+        endView.setUint16(8, files.length, true);
+        endView.setUint16(10, files.length, true);
+        endView.setUint32(12, centralSize, true);
+        endView.setUint32(16, offset, true);
+        endView.setUint16(20, 0, true);
+
+        return new Blob(localParts.concat(centralParts, [end]), { type: "application/zip" });
+      }
+
+      var crcTable = null;
+      function crc32(data) {
+        if (!crcTable) {
+          crcTable = new Uint32Array(256);
+          for (var i = 0; i < 256; i++) {
+            var c = i;
+            for (var k = 0; k < 8; k++) {
+              c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+            }
+            crcTable[i] = c >>> 0;
+          }
+        }
+        var crc = 0xffffffff;
+        for (var j = 0; j < data.length; j++) {
+          crc = crcTable[(crc ^ data[j]) & 0xff] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      function dosDateTime(date) {
+        var year = Math.max(1980, date.getFullYear());
+        return {
+          time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+          date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()
+        };
+      }
+
+      function uniqueOutputName(outputs, name) {
+        var used = {};
+        outputs.forEach(function (item) {
+          used[item.name] = true;
+        });
+        if (!used[name]) return name;
+        var dot = name.lastIndexOf(".");
+        var base = dot >= 0 ? name.slice(0, dot) : name;
+        var ext = dot >= 0 ? name.slice(dot) : "";
+        var index = 2;
+        while (used[base + "_" + index + ext]) index++;
+        return base + "_" + index + ext;
+      }
+
+      function downloadBlob(blob, name) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function stripExtension(name) {
+        return String(name).replace(/\.[^.]+$/, "");
+      }
+
+      function normalizeKey(name) {
+        return stripExtension(String(name || "").replace(/\\/g, "/").split("/").pop()).toLowerCase();
+      }
+
+      function safeName(name) {
+        var cleaned = String(name || "region")
+          .replace(/\.(png|jpg|jpeg|tif|tiff)$/i, "")
+          .replace(/\\/g, "/")
+          .split("/")
+          .map(function (part) {
+            return part.replace(/[<>:"|?*]+/g, "_").trim();
+          })
+          .filter(function (part) {
+            return part && part !== "." && part !== "..";
+          })
+          .join("/");
+        return cleaned || "region";
+      }
+
+      function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / 1024 / 1024).toFixed(1) + " MB";
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (char) {
+          return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+          }[char];
+        });
+      }
+
+      window.SpineAtlasSlicer = {
+        parseAtlas: parseAtlas,
+        parseSpineJsonAttachments: parseSpineJsonAttachments,
+        resolveUvCrop: resolveUvCrop,
+        readNumbers: readNumbers
+      };
+    }());
+  </script>
+</body>
+</html>
