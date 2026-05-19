@@ -91,6 +91,27 @@ This repository contains offline HTML utilities for working with Spine assets: e
 - 原始图层组、剪贴关系、隐藏原画层和 Cubism 工程信息无法完整恢复。
 - 此工具内置 Live2D Cubism Core JavaScript 运行时，相关 Live2D 条款仍然适用。
 
+
+### 4. png-atlas-packer.html
+
+Packs split PNG slice files back into one or more PNG atlas pages.
+
+Features:
+
+- Imports multiple `.png` files or a folder such as `slices/`
+- Keeps original atlas order by default using natural filename order
+- Packs left-to-right and top-to-bottom in that order unless size optimization is selected
+- Exports atlas PNG page(s), `atlas.json`, and `atlas.tsv`
+- Supports padding, edge extrude, optional transparent trim, and power-of-two pages
+
+Usage:
+
+1. Open `png-atlas-packer.html` in a browser.
+2. Select or drag in the split PNG slices.
+3. Keep `Original atlas order` selected when order must match the source atlas.
+4. Click `Generate atlas ZIP`.
+5. Use the exported PNG page(s) and mapping file together.
+
 ## English
 
 ### 1. spine-atlas-to-images.html
@@ -177,6 +198,27 @@ Notes:
 - This is an approximate rebuild from runtime `.moc3` data, not the original PSD.
 - Original layer groups, clipping relationships, hidden source art, and Cubism project data cannot be fully recovered.
 - This tool embeds the Live2D Cubism Core JavaScript runtime; the applicable Live2D terms still apply.
+
+
+### 4. png-atlas-packer.html
+
+Packs split PNG slice files back into one or more PNG atlas pages.
+
+Features:
+
+- Imports multiple `.png` files or a folder such as `slices/`
+- Keeps original atlas order by default using natural filename order
+- Packs left-to-right and top-to-bottom in that order unless size optimization is selected
+- Exports atlas PNG page(s), `atlas.json`, and `atlas.tsv`
+- Supports padding, edge extrude, optional transparent trim, and power-of-two pages
+
+Usage:
+
+1. Open `png-atlas-packer.html` in a browser.
+2. Select or drag in the split PNG slices.
+3. Keep `Original atlas order` selected when order must match the source atlas.
+4. Click `Generate atlas ZIP`.
+5. Use the exported PNG page(s) and mapping file together.
 
 ## License
 
