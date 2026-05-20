@@ -12,9 +12,12 @@
       --ink: #1d2733;
       --muted: #667085;
       --line: #d8dee7;
-      --accent: #1f7a8c;
-      --accent-dark: #165c6a;
-      --green: #256f5c;
+      --spine: #256f5c;
+      --spine-dark: #1b5748;
+      --spine-soft: #eef8f3;
+      --live2d: #8a4f22;
+      --live2d-dark: #6b3d19;
+      --live2d-soft: #fff4e8;
       --shadow: 0 16px 40px rgba(17, 24, 39, 0.08);
     }
 
@@ -29,12 +32,14 @@
       color: var(--ink);
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.55;
+      overflow-x: hidden;
     }
 
     main {
-      width: min(1040px, calc(100vw - 32px));
+      width: 100%;
+      max-width: 1072px;
       margin: 0 auto;
-      padding: 40px 0;
+      padding: 40px 16px;
     }
 
     header {
@@ -53,22 +58,84 @@
       font-size: clamp(30px, 5vw, 52px);
       line-height: 1.08;
       letter-spacing: 0;
+      overflow-wrap: anywhere;
     }
 
     .lead {
       max-width: 760px;
       color: var(--muted);
       font-size: 16px;
+      overflow-wrap: anywhere;
+    }
+
+    .tool-section {
+      margin-top: 30px;
+    }
+
+    .section-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: end;
+      margin-bottom: 14px;
+    }
+
+    .section-header > *,
+    .grid > * {
+      min-width: 0;
+    }
+
+    .section-kicker {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .section-kicker.spine,
+    .tag.spine {
+      background: var(--spine-soft);
+      color: var(--spine-dark);
+    }
+
+    .section-kicker.live2d,
+    .tag.live2d {
+      background: var(--live2d-soft);
+      color: var(--live2d-dark);
+    }
+
+    .section-title {
+      margin-top: 8px;
+      font-size: 28px;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    .section-copy {
+      max-width: 650px;
+      color: var(--muted);
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
+    .workflow {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+      white-space: nowrap;
     }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 16px;
-      margin-top: 24px;
     }
 
     .card {
+      min-width: 0;
       min-height: 260px;
       background: var(--panel);
       border: 1px solid var(--line);
@@ -81,20 +148,26 @@
       gap: 18px;
     }
 
+    .card.spine {
+      border-top-color: rgba(37, 111, 92, 0.45);
+    }
+
+    .card.live2d {
+      border-top-color: rgba(138, 79, 34, 0.45);
+      min-height: 250px;
+    }
+
+    .live2d-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .tag {
       display: inline-flex;
       width: fit-content;
       border-radius: 999px;
       padding: 4px 9px;
-      background: #edf8fa;
-      color: var(--accent-dark);
       font-size: 12px;
       font-weight: 700;
-    }
-
-    .tag.green {
-      background: #eef8f3;
-      color: var(--green);
     }
 
     h2 {
@@ -102,12 +175,14 @@
       font-size: 22px;
       line-height: 1.25;
       letter-spacing: 0;
+      overflow-wrap: anywhere;
     }
 
     .desc {
       margin-top: 9px;
       color: var(--muted);
       font-size: 14px;
+      overflow-wrap: anywhere;
     }
 
     ul {
@@ -115,6 +190,7 @@
       padding-left: 18px;
       color: var(--muted);
       font-size: 14px;
+      overflow-wrap: anywhere;
     }
 
     a.button {
@@ -123,24 +199,30 @@
       align-items: center;
       min-height: 40px;
       width: fit-content;
+      max-width: 100%;
       border-radius: 6px;
       padding: 9px 13px;
       color: #fff;
-      background: var(--accent);
       text-decoration: none;
       font-weight: 750;
+      text-align: center;
+      overflow-wrap: anywhere;
     }
 
-    a.button:hover {
-      background: var(--accent-dark);
+    .button.spine {
+      background: var(--spine);
     }
 
-    .button.green {
-      background: var(--green);
+    .button.spine:hover {
+      background: var(--spine-dark);
     }
 
-    .button.green:hover {
-      background: #1b5748;
+    .button.live2d {
+      background: var(--live2d);
+    }
+
+    .button.live2d:hover {
+      background: var(--live2d-dark);
     }
 
     .note {
@@ -161,7 +243,7 @@
     }
 
     .links a {
-      color: var(--accent-dark);
+      color: var(--spine-dark);
       font-weight: 700;
       text-decoration: none;
     }
@@ -170,9 +252,29 @@
       text-decoration: underline;
     }
 
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .live2d-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
     @media (max-width: 760px) {
       main {
-        padding: 28px 0;
+        padding: 28px 14px;
+      }
+
+      .section-header {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+
+      .workflow {
+        text-align: left;
+        white-space: normal;
       }
 
       .grid {
@@ -188,74 +290,100 @@
       <p class="lead">离线可用的 Spine / Live2D 资源辅助工具。Extract, rebuild, and round-trip atlas images directly in your browser.</p>
     </header>
 
-    <section class="grid" aria-label="Tools">
-      <article class="card">
+    <section class="tool-section" aria-labelledby="spine-tools-title">
+      <div class="section-header">
         <div>
-          <span class="tag green">Atlas / Images</span>
-          <h2>Spine Atlas 切图工具</h2>
-          <p class="desc">从 `.atlas` 与合图 PNG 中导出独立切图，可选 JSON 辅助按 attachment / UV 导出更细的图像。</p>
-          <ul>
-            <li>支持拖入 atlas、PNG、JSON</li>
-            <li>处理 rotate、orig、offset</li>
-            <li>输出 images.zip 与 atlas_manifest.json</li>
-          </ul>
+          <span class="section-kicker spine">Spine Workflow</span>
+          <h2 id="spine-tools-title" class="section-title">Spine 工具</h2>
+          <p class="section-copy">面向 Spine `.atlas`、`.json` 和 Photoshop 往返编辑，覆盖解包切图、PSD 还原、切图回填图集三个环节。</p>
         </div>
-        <a class="button green" href="spine-atlas-to-images.html">打开工具 / Open Tool</a>
-      </article>
-      <article class="card">
-        <div>
-          <span class="tag green">Images / Atlas</span>
-          <h2>Spine 切图还原图集</h2>
-          <p class="desc">读取原 `.atlas`、原 page PNG 与修改后的切图，按原素材摆放烘回图集，输出可直接替换的 atlas PNG。</p>
-          <ul>
-            <li>使用 atlas_manifest.json 精确匹配切图</li>
-            <li>支持 rotate、orig、offset 反向打包</li>
-            <li>缺失切图可保留原图集底图</li>
-          </ul>
-        </div>
-        <a class="button green" href="spine-images-to-atlas.html">打开工具 / Open Tool</a>
-      </article>
-      <article class="card">
-        <div>
-          <span class="tag">Live2D / Texture</span>
-          <h2>Live2D 切图反向还原图集</h2>
-          <p class="desc">读取原 model3、moc3 与 textures，把修改后的 slices 按 ArtMesh UV 三角形烘回原 Live2D 图集。</p>
-          <ul>
-            <li>根据 moc3 drawable 顶点和 UV 反向映射</li>
-            <li>优先使用 PSD 重建包的 manifest.json 精确定位切图</li>
-            <li>输出路径与 model3.json 的 texture 引用一致</li>
-          </ul>
-        </div>
-        <a class="button" href="live2d-texture-rebuilder.html">打开工具 / Open Tool</a>
-      </article>
+        <p class="workflow">atlas -> images -> PSD -> images -> atlas</p>
+      </div>
 
-      <article class="card">
-        <div>
-          <span class="tag">JSON / Photoshop</span>
-          <h2>Spine JSON 转 Photoshop JSX</h2>
-          <p class="desc">读取 Spine JSON 的 bones、slots、skins 与附件信息，生成可在 Photoshop 中执行的图层重建脚本。</p>
-          <ul>
-            <li>按 setup pose 视觉还原</li>
-            <li>保留 Spine slot 绘制顺序</li>
-            <li>记录原始像素尺寸，支持逆向导出切图</li>
-          </ul>
-        </div>
-        <a class="button" href="spine-json-to-photoshop-jsx.html">打开工具 / Open Tool</a>
-      </article>
+      <div class="grid">
+        <article class="card spine">
+          <div>
+            <span class="tag spine">Atlas / Images</span>
+            <h2>Spine Atlas 切图工具</h2>
+            <p class="desc">从 `.atlas` 与合图 PNG 中导出独立切图，可选 JSON 辅助按 attachment / UV 导出更细的图像。</p>
+            <ul>
+              <li>支持拖入 atlas、PNG、JSON</li>
+              <li>处理 rotate、orig、offset</li>
+              <li>输出 images.zip 与 atlas_manifest.json</li>
+            </ul>
+          </div>
+          <a class="button spine" href="spine-atlas-to-images.html">打开工具 / Open Tool</a>
+        </article>
 
-      <article class="card">
+        <article class="card spine">
+          <div>
+            <span class="tag spine">JSON / Photoshop</span>
+            <h2>Spine JSON 转 Photoshop JSX</h2>
+            <p class="desc">读取 Spine JSON 的 bones、slots、skins 与附件信息，生成可在 Photoshop 中执行的图层重建脚本。</p>
+            <ul>
+              <li>按 setup pose 视觉还原</li>
+              <li>保留 Spine slot 绘制顺序</li>
+              <li>记录原始像素尺寸，支持逆向导出切图</li>
+            </ul>
+          </div>
+          <a class="button spine" href="spine-json-to-photoshop-jsx.html">打开工具 / Open Tool</a>
+        </article>
+
+        <article class="card spine">
+          <div>
+            <span class="tag spine">Images / Atlas</span>
+            <h2>Spine 切图还原图集</h2>
+            <p class="desc">读取原 `.atlas`、原 page PNG 与修改后的切图，按原素材摆放烘回图集，输出可直接替换的 atlas PNG。</p>
+            <ul>
+              <li>使用 atlas_manifest.json 精确匹配切图</li>
+              <li>支持 rotate、orig、offset 反向打包</li>
+              <li>缺失切图可保留原图集底图</li>
+            </ul>
+          </div>
+          <a class="button spine" href="spine-images-to-atlas.html">打开工具 / Open Tool</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="tool-section" aria-labelledby="live2d-tools-title">
+      <div class="section-header">
         <div>
-          <span class="tag">Live2D / Photoshop</span>
-          <h2>Live2D 转近似分层 PSD</h2>
-          <p class="desc">从 Cubism 导出包读取 moc3、model3.json、motion3.json 与贴图，生成 Photoshop JSX 和 ArtMesh 切图 ZIP。</p>
-          <ul>
-            <li>按 Live2D render order 生成图层顺序</li>
-            <li>支持 motion3 姿态采样和 UV V 轴翻转</li>
-            <li>单文件离线运行，内置 Cubism Core</li>
-          </ul>
+          <span class="section-kicker live2d">Live2D Workflow</span>
+          <h2 id="live2d-tools-title" class="section-title">Live2D 工具</h2>
+          <p class="section-copy">面向 Cubism 导出包和 texture atlas，侧重从运行时数据近似重建 PSD，并把修改后的 ArtMesh 切图烘回原贴图。</p>
         </div>
-        <a class="button" href="live2d-psd-rebuilder.html">打开工具 / Open Tool</a>
-      </article>
+        <p class="workflow">model3 / moc3 -> PSD slices -> texture atlas</p>
+      </div>
+
+      <div class="grid live2d-grid">
+        <article class="card live2d">
+          <div>
+            <span class="tag live2d">Live2D / Photoshop</span>
+            <h2>Live2D 转近似分层 PSD</h2>
+            <p class="desc">从 Cubism 导出包读取 moc3、model3.json、motion3.json 与贴图，生成 Photoshop JSX 和 ArtMesh 切图 ZIP。</p>
+            <ul>
+              <li>按 Live2D render order 生成图层顺序</li>
+              <li>支持 motion3 姿态采样和 UV V 轴翻转</li>
+              <li>单文件离线运行，内置 Cubism Core</li>
+            </ul>
+          </div>
+          <a class="button live2d" href="live2d-psd-rebuilder.html">打开工具 / Open Tool</a>
+        </article>
+
+        <article class="card live2d">
+          <div>
+            <span class="tag live2d">Live2D / Texture</span>
+            <h2>Live2D 切图反向还原图集</h2>
+            <p class="desc">读取原 model3、moc3 与 textures，把修改后的 slices 按 ArtMesh UV 三角形烘回原 Live2D 图集。</p>
+            <ul>
+              <li>根据 moc3 drawable 顶点和 UV 反向映射</li>
+              <li>优先使用 PSD 重建包的 manifest.json 精确定位切图</li>
+              <li>输出路径与 model3.json 的 texture 引用一致</li>
+            </ul>
+          </div>
+          <a class="button live2d" href="live2d-texture-rebuilder.html">打开工具 / Open Tool</a>
+        </article>
+      </div>
     </section>
 
     <section class="note">
