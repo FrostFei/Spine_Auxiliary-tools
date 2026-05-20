@@ -721,9 +721,34 @@
             if (item.url) URL.revokeObjectURL(item.url);
           });
           state.outputs = outputs;
-          state.zipBlob = await createZip(outputs.map(function (item) {
+          var manifest = buildAtlasManifest(outputs, {
+            exportMode: isJsonMode() ? "json" : "atlas",
+            restoreOrig: restoreOrig.checked
+          });
+          var zipFiles = outputs.map(function (item) {
             return { name: item.name, blob: item.blob };
-          }));
+          });
+          zipFiles.push({
+            name: "atlas_manifest.json",
+            blob: new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" })
+          });
+          zipFiles.push({
+            name: "README.txt",
+            blob: new Blob([
+              [
+                "Spine atlas image package",
+                "",
+                "images/ contains extracted PNG slices.",
+                "atlas_manifest.json records original atlas page, xy, size, rotate, orig and offset data.",
+                "Use spine-images-to-atlas.html with this manifest to bake modified slices back to the original atlas layout.",
+                "",
+                isJsonMode()
+                  ? "This package was exported in JSON attachment/UV mode. For direct atlas replacement, Atlas region mode is recommended."
+                  : "This package was exported in Atlas region mode and is suitable for direct atlas rebuild."
+              ].join("\r\n")
+            ], { type: "text/plain" })
+          });
+          state.zipBlob = await createZip(zipFiles);
 
           renderPreview(outputs);
           renderStats({
@@ -736,7 +761,10 @@
           });
 
           var modeText = isJsonMode() ? "JSON 附件 / UV 模式" : "Atlas region 模式";
-          var doneMessages = [{ type: "ok", text: "已生成 " + outputs.length + " 张切图（" + modeText + "），可以下载 images.zip。" }];
+          var doneMessages = [{ type: "ok", text: "已生成 " + outputs.length + " 张切图（" + modeText + "），ZIP 已包含 atlas_manifest.json。" }];
+          if (isJsonMode()) {
+            doneMessages.push({ type: "warn", text: "JSON 附件 / UV 模式更适合精细解包；如果要直接回填替换原图集，建议关闭该选项后按 Atlas region 模式导出。" });
+          }
           if (missingPages.length) {
             doneMessages.push({ type: "warn", text: "缺少 page PNG：" + missingPages.join("，") });
           }
@@ -780,6 +808,71 @@
           });
         });
         return jobs;
+      }
+
+      function buildAtlasManifest(outputs, options) {
+        var outputByRegion = {};
+        outputs.forEach(function (item) {
+          if (!outputByRegion[item.region.name]) outputByRegion[item.region.name] = [];
+          outputByRegion[item.region.name].push({
+            path: item.name,
+            fileName: item.name.replace(/^images\//, ""),
+            width: item.width,
+            height: item.height,
+            mode: item.job.mode,
+            crop: item.job.crop,
+            attachment: item.job.attachment ? {
+              skin: item.job.attachment.skinName,
+              slot: item.job.attachment.slotName,
+              attachment: item.job.attachment.attachmentName,
+              imageName: item.job.attachment.imageName,
+              type: item.job.attachment.type
+            } : null
+          });
+        });
+
+        return {
+          tool: "Spine atlas slicer",
+          version: 1,
+          generatedAt: new Date().toISOString(),
+          sourceAtlas: state.atlasFile ? state.atlasFile.name : "",
+          exportMode: options.exportMode,
+          restoreOrig: !!options.restoreOrig,
+          compatibleWithAtlasRebuild: options.exportMode === "atlas",
+          pages: state.atlas.pages.map(function (page) {
+            var image = findPageImage(page);
+            return {
+              name: page.name,
+              width: page.width || (image ? image.image.width : 0),
+              height: page.height || (image ? image.image.height : 0),
+              imageWidth: image ? image.image.width : 0,
+              imageHeight: image ? image.image.height : 0,
+              format: page.format || "",
+              filter: page.filter || "",
+              repeat: page.repeat || "",
+              pma: page.pma || ""
+            };
+          }),
+          regions: state.atlas.regions.map(function (region) {
+            return {
+              name: region.name,
+              page: region.page.name,
+              x: region.x,
+              y: region.y,
+              width: region.width,
+              height: region.height,
+              packedWidth: region.rotate ? region.height : region.width,
+              packedHeight: region.rotate ? region.width : region.height,
+              rotate: !!region.rotate,
+              origWidth: region.origWidth || region.width,
+              origHeight: region.origHeight || region.height,
+              offsetX: region.offsetX || 0,
+              offsetY: region.offsetY || 0,
+              index: region.index == null ? -1 : region.index,
+              outputs: outputByRegion[region.name] || []
+            };
+          })
+        };
       }
 
       function isJsonMode() {
@@ -1382,6 +1475,7 @@
       window.SpineAtlasSlicer = {
         parseAtlas: parseAtlas,
         parseSpineJsonAttachments: parseSpineJsonAttachments,
+        buildAtlasManifest: buildAtlasManifest,
         resolveUvCrop: resolveUvCrop,
         readNumbers: readNumbers
       };

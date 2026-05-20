@@ -185,7 +185,7 @@
   <main>
     <header>
       <h1>Spine Auxiliary Tools</h1>
-      <p class="lead">离线可用的 Spine 资源辅助工具。Extract Spine atlas images and generate Photoshop JSX scripts directly in your browser.</p>
+      <p class="lead">离线可用的 Spine / Live2D 资源辅助工具。Extract, rebuild, and round-trip atlas images directly in your browser.</p>
     </header>
 
     <section class="grid" aria-label="Tools">
@@ -197,10 +197,23 @@
           <ul>
             <li>支持拖入 atlas、PNG、JSON</li>
             <li>处理 rotate、orig、offset</li>
-            <li>输出 images.zip</li>
+            <li>输出 images.zip 与 atlas_manifest.json</li>
           </ul>
         </div>
         <a class="button green" href="spine-atlas-to-images.html">打开工具 / Open Tool</a>
+      </article>
+      <article class="card">
+        <div>
+          <span class="tag green">Images / Atlas</span>
+          <h2>Spine 切图还原图集</h2>
+          <p class="desc">读取原 `.atlas`、原 page PNG 与修改后的切图，按原素材摆放烘回图集，输出可直接替换的 atlas PNG。</p>
+          <ul>
+            <li>使用 atlas_manifest.json 精确匹配切图</li>
+            <li>支持 rotate、orig、offset 反向打包</li>
+            <li>缺失切图可保留原图集底图</li>
+          </ul>
+        </div>
+        <a class="button green" href="spine-images-to-atlas.html">打开工具 / Open Tool</a>
       </article>
       <article class="card">
         <div>
@@ -224,7 +237,7 @@
           <ul>
             <li>按 setup pose 视觉还原</li>
             <li>保留 Spine slot 绘制顺序</li>
-            <li>生成可下载的 JSX</li>
+            <li>记录原始像素尺寸，支持逆向导出切图</li>
           </ul>
         </div>
         <a class="button" href="spine-json-to-photoshop-jsx.html">打开工具 / Open Tool</a>

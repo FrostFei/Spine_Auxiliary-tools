@@ -1,8 +1,8 @@
 # Spine Auxiliary Tools
 
-离线可用的 Spine 辅助工具集合，用于从 Spine 资源中解包切图，以及从 Spine JSON 生成 Photoshop 可执行脚本。
+离线可用的 Spine / Live2D 辅助工具集合，用于从 Spine 资源中解包切图、把修改后的切图还原成原图集，以及从 Spine JSON 生成 Photoshop 可执行脚本。
 
-This repository contains offline HTML utilities for working with Spine assets: extracting images from atlas files and rebuilding a Photoshop layer layout from Spine JSON.
+This repository contains offline HTML utilities for working with Spine and Live2D assets: extracting images from atlas files, rebuilding atlas textures from modified slices, and rebuilding a Photoshop layer layout from Spine JSON.
 
 ## 工具列表
 
@@ -18,7 +18,7 @@ This repository contains offline HTML utilities for working with Spine assets: e
 - 支持 `rotate: true` 的 atlas 区域旋回
 - 支持按 `orig / offset` 还原透明画布
 - JSON 模式下可按 attachment / UV 导出更细的切图
-- 输出 `images.zip`
+- 输出包含 `images/`、`atlas_manifest.json` 与说明文件的 ZIP
 
 使用方式：
 
@@ -34,8 +34,39 @@ This repository contains offline HTML utilities for working with Spine assets: e
 - 浏览器安全机制不允许网页自动把文件保存到 `.atlas` 所在目录。
 - 下载位置由浏览器设置决定。
 - JSON / UV 模式会按 Spine attachment 使用范围导出，可能比 atlas 原始 region 更多。
+- 如需后续直接还原成原图集，建议关闭 JSON / UV 模式，使用 Atlas region 模式导出。
 
-### 2. spine-json-to-photoshop-jsx.html
+### 2. spine-images-to-atlas.html
+
+把修改后的 Spine 切图按原 `.atlas` 的素材摆放烘回 page PNG，用于直接替换原图集。
+
+功能：
+
+- 导入原 `.atlas`
+- 导入一张/多张原 page PNG
+- 导入修改后的 `images/*.png` 与推荐的 `atlas_manifest.json`
+- 支持 `rotate: true` 区域反向打包
+- 支持按 `orig / offset` 从透明画布中裁回 packed region
+- 可选择以原图集为底，只覆盖找到的切图区域
+- 输出 page 路径与原 `.atlas` 一致的 ZIP
+
+使用方式：
+
+1. 用浏览器打开 `spine-images-to-atlas.html`。
+2. 选择原 `.atlas` 文件。
+3. 选择原图集 page PNG。
+4. 选择修改后的 `images` 文件夹，建议同时包含 `atlas_manifest.json`。
+5. 确认切图坐标类型，通常保持 `自动识别（推荐）`。
+6. 点击 `生成还原图集 ZIP`。
+7. 将 ZIP 内的 PNG 放入模型副本中替换原图集 PNG。
+
+注意：
+
+- 若修改后的切图仍是解包时的原始尺寸 / 透明画布，可直接回填。
+- 若切图来自 Photoshop 姿势 PSD，请优先使用 `spine-json-to-photoshop-jsx.html` 同步生成的逆向 JSX。它会按图片名、原始 PNG 像素尺寸、摆放尺寸和旋转角反向导出。
+- 不改变 `.atlas` 文件时，超出原 `origWidth / origHeight` 或原 packed 区域的新增内容会被裁掉。
+
+### 3. spine-json-to-photoshop-jsx.html
 
 从 Spine `.json` 生成 Photoshop 可执行的 `.jsx` 脚本，用于按 setup pose 视觉还原图层位置。
 
@@ -45,25 +76,33 @@ This repository contains offline HTML utilities for working with Spine assets: e
 - 解析 bones、slots、skins、region、mesh
 - 按 Spine slot 顺序生成 Photoshop 图层
 - 生成可复制或下载的 `.jsx`
+- 同步生成逆向 `.jsx`，可从修改后的 PSD 导出回 `images/*.png`
 - 图层名保留切图原名称
+- 默认以普通图层放置切图，并把图片名、原始 PNG 像素尺寸和变换写入 PSD 隐藏元数据层，方便逆向导出
+- 可选使用智能对象放置切图
 - 对空图层或单层失败做容错，避免整个脚本中断
 
 使用方式：
 
 1. 用浏览器打开 `spine-json-to-photoshop-jsx.html`。
 2. 拖入 Spine `.json`。
-3. 点击 `下载 JSX`。
+3. 点击 `下载拼图 JSX`，也可以同时下载 `下载逆向 JSX`。
 4. 在 Photoshop 中选择 `文件 > 脚本 > 浏览...`。
-5. 运行下载的 `.jsx` 文件。
+5. 运行拼图 `.jsx` 文件。
 6. 弹窗出现时，选择对应的 `images` 文件夹。
+7. 修改 PSD 后，保持该 PSD 打开，再运行逆向 `.jsx`，先选择输出目录；如 PSD 是旧脚本生成的或没有隐藏元数据，再选择原始解包 `images` 文件夹作为尺寸参考。
 
 注意：
 
 - `region` 附件会按坐标还原。
 - `mesh` 附件会拟合为 Photoshop 可执行的缩放、旋转和平移。
 - 复杂 mesh 弯曲不会在 JSX 中做三角形变形，因此结果偏向视觉还原而非完全变形还原。
+- 如果后续要把修改内容回填到原 atlas，建议保持“以智能对象放置切图”关闭，使用普通图层编辑，再运行逆向 JSX 导出切图。
+- 逆向 JSX 会导出 PSD 中当前图层像素，再按记录的图片名、原始 PNG 像素尺寸、摆放尺寸和旋转角做反向处理；普通图层和智能对象图层都会走同一套还原逻辑。
+- 新拼图 JSX 会在 PSD 中写入 `__spine_roundtrip_manifest__` 隐藏文本层；如果使用旧 PSD，逆向 JSX 可通过原始解包 `images` 文件夹读取真实 PNG 宽高。
+- 如果图层被用户额外自由变换，仍可能产生偏差。
 
-### 3. live2d-psd-rebuilder.html
+### 4. live2d-psd-rebuilder.html
 
 从 Live2D Cubism 导出包生成 Photoshop 可运行的 `.jsx` 和 ArtMesh 切图 ZIP，用于近似还原分层 PSD。
 
@@ -92,7 +131,7 @@ This repository contains offline HTML utilities for working with Spine assets: e
 - 此工具内置 Live2D Cubism Core JavaScript 运行时，相关 Live2D 条款仍然适用。
 
 
-### 4. live2d-texture-rebuilder.html
+### 5. live2d-texture-rebuilder.html
 
 Live2D 专用的切图反向还原图集工具，用于把 `live2d-psd-rebuilder.html` 生成并修改后的 `slices` 烘回原始 Live2D texture atlas。
 
@@ -127,7 +166,7 @@ Features:
 - Handles `rotate: true` packed regions
 - Can restore transparent canvas using `orig / offset`
 - JSON mode can export more precise attachment/UV-based crops
-- Exports an `images.zip`
+- Exports a ZIP containing `images/`, `atlas_manifest.json`, and notes
 
 Usage:
 
@@ -143,8 +182,39 @@ Notes:
 - A browser page cannot automatically save files into the original `.atlas` directory.
 - The download location is controlled by your browser settings.
 - JSON/UV mode may export more images than the raw atlas regions because it follows actual Spine attachments.
+- For direct atlas rebuilding, Atlas region mode is recommended instead of JSON/UV mode.
 
-### 2. spine-json-to-photoshop-jsx.html
+### 2. spine-images-to-atlas.html
+
+Bakes modified Spine slices back into the original atlas page layout so the exported PNGs can replace the original atlas textures directly.
+
+Features:
+
+- Loads the original `.atlas`
+- Loads one or more original page PNG files
+- Loads modified `images/*.png` and the recommended `atlas_manifest.json`
+- Re-packs `rotate: true` regions
+- Crops packed regions from restored `orig / offset` transparent canvases
+- Can preserve the original atlas as the base and overwrite only matched slice regions
+- Exports a ZIP whose page paths match the original `.atlas`
+
+Usage:
+
+1. Open `spine-images-to-atlas.html` in a browser.
+2. Select the original `.atlas` file.
+3. Select the original atlas page PNG files.
+4. Select the modified `images` folder, preferably with `atlas_manifest.json`.
+5. Keep the slice coordinate mode on `自动识别（推荐）` / auto unless you know the source type.
+6. Click `生成还原图集 ZIP` / `Generate rebuilt atlas ZIP`.
+7. Copy the exported PNGs into a duplicate model folder to replace the original atlas pages.
+
+Notes:
+
+- Slices that still match the extracted original size or transparent canvas can be baked back directly.
+- If slices come from a Photoshop pose PSD, prefer the reverse JSX generated by `spine-json-to-photoshop-jsx.html`; it uses recorded image names, original sizes, and rotations to export slices back.
+- If the `.atlas` is unchanged, new artwork outside the original `origWidth / origHeight` or packed region will be clipped.
+
+### 3. spine-json-to-photoshop-jsx.html
 
 Generates a Photoshop `.jsx` script from a Spine `.json` file to visually rebuild layers in setup pose.
 
@@ -154,25 +224,33 @@ Features:
 - Parses bones, slots, skins, regions, and meshes
 - Preserves Spine slot draw order
 - Generates a downloadable/copyable Photoshop JSX script
+- Also generates a reverse JSX script that exports edited PSD layers back into `images/*.png`
 - Uses original image names as Photoshop layer names
+- Places slices as regular raster layers by default while writing image names, original PNG pixel sizes, and transforms into a hidden PSD metadata layer for reverse export
+- Can optionally place slices as Smart Objects
 - Skips empty or failed layers safely instead of stopping the whole script
 
 Usage:
 
 1. Open `spine-json-to-photoshop-jsx.html` in a browser.
 2. Drop the Spine `.json` file.
-3. Click `下载 JSX` / `Download JSX`.
+3. Click `下载拼图 JSX` / `Download build JSX`, and optionally download `下载逆向 JSX` / `Download reverse JSX`.
 4. In Photoshop, choose `File > Scripts > Browse...`.
-5. Run the downloaded `.jsx` file.
+5. Run the build `.jsx` file.
 6. When prompted, select the matching `images` folder.
+7. After editing the PSD, keep it open, run the reverse `.jsx`, choose an output folder, then select the original unpacked `images` folder if the PSD was generated by an older script or has no hidden metadata.
 
 Notes:
 
 - Region attachments are positioned directly.
 - Mesh attachments are approximated with Photoshop-supported scale, rotation, and translation.
 - Complex mesh deformation is not triangulated in JSX, so the result is intended for visual reconstruction rather than perfect deformation reproduction.
+- If you plan to rebuild the original atlas, keep Smart Object placement disabled, edit regular layers, then run the reverse JSX to export slices.
+- The reverse JSX exports the current PSD layer pixels, then uses recorded image name, original PNG pixel size, placed size, and rotation to inverse-transform the layer. Regular layers and Smart Object layers use the same restore path.
+- New build JSX files add a hidden `__spine_roundtrip_manifest__` text layer to the PSD. For older PSDs, the reverse JSX can read exact PNG dimensions from the original unpacked `images` folder.
+- Extra manual free transforms may still introduce drift.
 
-### 3. live2d-psd-rebuilder.html
+### 4. live2d-psd-rebuilder.html
 
 Generates a Photoshop `.jsx` script and ArtMesh slice images from a Live2D Cubism runtime export package, for approximate layered PSD reconstruction.
 
@@ -201,7 +279,7 @@ Notes:
 - This tool embeds the Live2D Cubism Core JavaScript runtime; the applicable Live2D terms still apply.
 
 
-### 4. live2d-texture-rebuilder.html
+### 5. live2d-texture-rebuilder.html
 
 A Live2D-specific reverse texture rebuilder. It bakes modified `slices` generated by `live2d-psd-rebuilder.html` back into the original Live2D texture atlas layout.
 

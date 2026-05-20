@@ -69,7 +69,7 @@
       min-height: calc(100vh - 48px);
       padding: 18px;
       display: grid;
-      grid-template-rows: auto minmax(280px, 1fr) auto;
+      grid-template-rows: minmax(240px, 1fr) minmax(240px, 1fr) auto;
       gap: 12px;
     }
 
@@ -159,6 +159,18 @@
       color: var(--ink);
       background: #fff;
       padding: 8px 10px;
+    }
+
+    .check {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .check input {
+      margin-top: 3px;
     }
 
     .button-row {
@@ -265,10 +277,17 @@
       align-items: center;
     }
 
+    .script-block {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
+    }
+
     textarea {
       width: 100%;
       height: 100%;
-      min-height: 320px;
+      min-height: 220px;
       resize: none;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -356,12 +375,18 @@
           <label for="padding">画布留白 px</label>
           <input id="padding" type="number" min="0" step="1" value="24">
         </div>
+        <label class="check">
+          <input id="smartObjects" type="checkbox">
+          以智能对象放置切图（可选，回填图集时建议关闭）
+        </label>
       </div>
 
       <div class="button-row">
         <button id="regenerate" type="button" disabled>重新生成</button>
-        <button id="copyScript" class="secondary" type="button" disabled>复制 JSX</button>
-        <button id="downloadScript" class="secondary" type="button" disabled>下载 JSX</button>
+        <button id="copyScript" class="secondary" type="button" disabled>复制拼图 JSX</button>
+        <button id="downloadScript" class="secondary" type="button" disabled>下载拼图 JSX</button>
+        <button id="copyReverseScript" class="secondary" type="button" disabled>复制逆向 JSX</button>
+        <button id="downloadReverseScript" class="secondary" type="button" disabled>下载逆向 JSX</button>
       </div>
 
       <div id="stats" class="stats"></div>
@@ -369,14 +394,27 @@
     </section>
 
     <section class="panel main">
-      <div class="toolbar">
-        <div>
-          <h2>Photoshop 脚本</h2>
-          <p class="subtle">在 Photoshop 里运行后选择对应的 images 文件夹</p>
+      <div class="script-block">
+        <div class="toolbar">
+          <div>
+            <h2>拼图 JSX：images -> PSD</h2>
+            <p class="subtle">在 Photoshop 里运行后选择对应的 images 文件夹</p>
+          </div>
         </div>
+
+        <textarea id="scriptOutput" readonly spellcheck="false"></textarea>
       </div>
 
-      <textarea id="scriptOutput" readonly spellcheck="false"></textarea>
+      <div class="script-block">
+        <div class="toolbar">
+          <div>
+            <h2>逆向 JSX：PSD -> images</h2>
+            <p class="subtle">在打开的 PSD 上运行，可选原始 images 文件夹校准导出尺寸</p>
+          </div>
+        </div>
+
+        <textarea id="reverseScriptOutput" readonly spellcheck="false"></textarea>
+      </div>
 
       <div class="layer-list">
         <table>
@@ -409,7 +447,8 @@
         json: null,
         file: null,
         manifest: null,
-        script: ""
+        script: "",
+        reverseScript: ""
       };
 
       var fileInput = document.getElementById("fileInput");
@@ -417,10 +456,14 @@
       var fileName = document.getElementById("fileName");
       var docName = document.getElementById("docName");
       var padding = document.getElementById("padding");
+      var smartObjects = document.getElementById("smartObjects");
       var regenerate = document.getElementById("regenerate");
       var copyScript = document.getElementById("copyScript");
       var downloadScript = document.getElementById("downloadScript");
+      var copyReverseScript = document.getElementById("copyReverseScript");
+      var downloadReverseScript = document.getElementById("downloadReverseScript");
       var scriptOutput = document.getElementById("scriptOutput");
+      var reverseScriptOutput = document.getElementById("reverseScriptOutput");
       var stats = document.getElementById("stats");
       var messages = document.getElementById("messages");
       var layerRows = document.getElementById("layerRows");
@@ -455,37 +498,59 @@
       padding.addEventListener("input", function () {
         if (state.json) generate();
       });
+      smartObjects.addEventListener("change", function () {
+        if (state.json) generate();
+      });
 
       copyScript.addEventListener("click", function () {
         if (!state.script) return;
-        scriptOutput.focus();
-        scriptOutput.select();
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(state.script).then(function () {
-            renderMessages([{ type: "ok", text: "已复制 JSX。" }], true);
-          }).catch(function () {
-            document.execCommand("copy");
-            renderMessages([{ type: "ok", text: "已选中并复制 JSX。" }], true);
-          });
-        } else {
-          document.execCommand("copy");
-          renderMessages([{ type: "ok", text: "已选中并复制 JSX。" }], true);
-        }
+        copyText(state.script, scriptOutput, "已复制拼图 JSX。");
+      });
+
+      copyReverseScript.addEventListener("click", function () {
+        if (!state.reverseScript) return;
+        copyText(state.reverseScript, reverseScriptOutput, "已复制逆向 JSX。");
       });
 
       downloadScript.addEventListener("click", function () {
         if (!state.script) return;
         var baseName = safeFileBase((docName.value || "spine_rebuild").trim() || "spine_rebuild");
-        var blob = new Blob([state.script], { type: "text/plain;charset=utf-8" });
+        downloadText(state.script, baseName + "_build_psd.jsx");
+      });
+
+      downloadReverseScript.addEventListener("click", function () {
+        if (!state.reverseScript) return;
+        var baseName = safeFileBase((docName.value || "spine_rebuild").trim() || "spine_rebuild");
+        downloadText(state.reverseScript, baseName + "_export_images.jsx");
+      });
+
+      function copyText(text, textarea, message) {
+        textarea.focus();
+        textarea.select();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            renderMessages([{ type: "ok", text: message }], true);
+          }).catch(function () {
+            document.execCommand("copy");
+            renderMessages([{ type: "ok", text: message }], true);
+          });
+        } else {
+          document.execCommand("copy");
+          renderMessages([{ type: "ok", text: message }], true);
+        }
+      }
+
+      function downloadText(text, fileName) {
+        var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
         var url = URL.createObjectURL(blob);
         var a = document.createElement("a");
         a.href = url;
-        a.download = baseName + ".jsx";
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-      });
+      }
 
       function readJsonFile(file) {
         var reader = new FileReader();
@@ -511,21 +576,28 @@
         try {
           var manifest = buildManifest(state.json, {
             name: (docName.value || "spine_rebuild").trim() || "spine_rebuild",
-            padding: Math.max(0, Number(padding.value) || 0)
+            padding: Math.max(0, Number(padding.value) || 0),
+            smartObjects: smartObjects.checked
           });
           state.manifest = manifest;
           state.script = buildJsx(manifest);
+          state.reverseScript = buildReverseJsx(manifest);
           scriptOutput.value = state.script;
+          reverseScriptOutput.value = state.reverseScript;
           regenerate.disabled = false;
           copyScript.disabled = false;
           downloadScript.disabled = false;
+          copyReverseScript.disabled = false;
+          downloadReverseScript.disabled = false;
           renderStats(manifest);
           renderLayerRows(manifest.layers);
           renderMessages(manifest.messages);
         } catch (error) {
           state.manifest = null;
           state.script = "";
+          state.reverseScript = "";
           scriptOutput.value = "";
+          reverseScriptOutput.value = "";
           renderLayerRows([]);
           renderStats(null);
           renderMessages([{ type: "bad", text: error.message }]);
@@ -535,10 +607,14 @@
       function clearOutput() {
         state.manifest = null;
         state.script = "";
+        state.reverseScript = "";
         scriptOutput.value = "";
+        reverseScriptOutput.value = "";
         regenerate.disabled = true;
         copyScript.disabled = true;
         downloadScript.disabled = true;
+        copyReverseScript.disabled = true;
+        downloadReverseScript.disabled = true;
         renderStats(null);
         renderLayerRows([]);
       }
@@ -644,6 +720,21 @@
             text: "跳过 " + skipped.length + " 项：" + skipped.slice(0, 6).join("；") + (skipped.length > 6 ? "；..." : "")
           });
         }
+        if (options.smartObjects) {
+          warningMessages.push({
+            type: "ok",
+            text: "JSX 将以智能对象放置切图；逆向 JSX 会导出当前 PSD 中的图层像素，并优先按 PSD 元数据或原始 images 文件夹的像素尺寸反向还原。"
+          });
+          warningMessages.push({
+            type: "ok",
+            text: "已同时生成逆向 JSX，可在修改后的 PSD 中导出回 images 切图。"
+          });
+        } else {
+          warningMessages.push({
+            type: "ok",
+            text: "JSX 将以普通图层放置切图，并把图片名、原始像素尺寸和变换写入 PSD 元数据，方便从 PSD 导出回 images。"
+          });
+        }
 
         warningMessages.unshift({
           type: "ok",
@@ -657,6 +748,7 @@
           width: width,
           height: height,
           padding: pad,
+          smartObjects: !!options.smartObjects,
           worldBounds: {
             minX: round(worldBounds.minX, 3),
             minY: round(worldBounds.minY, 3),
@@ -682,6 +774,8 @@
               attachment: layer.attachment,
               image: stripKnownImageExtension(layer.image),
               type: layer.type,
+              sourceWidth: round(Math.max(1, layer.sourceWidth || layer.width), 3),
+              sourceHeight: round(Math.max(1, layer.sourceHeight || layer.height), 3),
               x: layer.ps.x,
               y: layer.ps.y,
               width: layer.ps.width,
@@ -782,6 +876,8 @@
           type: "region",
           image: imagePath,
           center: center,
+          sourceWidth: width,
+          sourceHeight: height,
           width: Math.max(1, length(widthVec)),
           height: Math.max(1, length(heightVec)),
           rotation: Math.atan2(widthVec.y, widthVec.x) / DEG,
@@ -820,6 +916,8 @@
           type: attachment.type || "mesh",
           image: imagePath,
           center: center,
+          sourceWidth: numberOr(attachment.width, Math.max(1, width)),
+          sourceHeight: numberOr(attachment.height, Math.max(1, height)),
           width: Math.max(1, width),
           height: Math.max(1, height),
           rotation: rotation,
@@ -1054,6 +1152,7 @@
           name: manifest.name,
           width: manifest.width,
           height: manifest.height,
+          smartObjects: !!manifest.smartObjects,
           layers: manifest.layers
         };
         return [
@@ -1077,6 +1176,7 @@
           "  var doc = app.documents.add(manifest.width, manifest.height, 72, manifest.name, NewDocumentMode.RGB, DocumentFill.TRANSPARENT);",
           "  var missing = [];",
           "  var failed = [];",
+          "  var metadataFailed = null;",
           "",
           "  for (var i = 0; i < manifest.layers.length; i++) {",
           "    try {",
@@ -1086,12 +1186,19 @@
           "    }",
           "  }",
           "",
+          "  try {",
+          "    writeRoundtripMetadata(doc, manifest);",
+          "  } catch (metadataError) {",
+          "    metadataFailed = metadataError;",
+          "  }",
+          "",
           "  app.activeDocument = doc;",
           "  app.preferences.rulerUnits = oldUnits;",
-          "  if (missing.length || failed.length) {",
+          "  if (missing.length || failed.length || metadataFailed) {",
           "    var report = [];",
           "    if (missing.length) report.push(\"Missing images:\\n\" + missing.slice(0, 20).join(\"\\n\") + (missing.length > 20 ? \"\\n...\" : \"\"));",
           "    if (failed.length) report.push(\"Skipped failed layers:\\n\" + failed.slice(0, 20).join(\"\\n\") + (failed.length > 20 ? \"\\n...\" : \"\"));",
+          "    if (metadataFailed) report.push(\"Roundtrip metadata was not written; reverse JSX can still use a reference images folder.\\n\" + metadataFailed);",
           "    alert(\"Finished with warnings:\\n\\n\" + report.join(\"\\n\\n\"));",
           "  } else {",
           "    alert(\"Finished: \" + manifest.layers.length + \" layers\");",
@@ -1104,16 +1211,31 @@
           "      return;",
           "    }",
           "",
-          "    var source = app.open(file);",
-          "    var sourceLayer = source.activeLayer;",
-          "    try { sourceLayer.name = layerInfo.name; } catch (sourceNameError) {}",
-          "    var duplicated = sourceLayer.duplicate(doc, ElementPlacement.PLACEATBEGINNING);",
-          "    source.close(SaveOptions.DONOTSAVECHANGES);",
+          "    var duplicated = null;",
+          "    var pixelWidth = null;",
+          "    var pixelHeight = null;",
+          "    if (manifest.smartObjects) {",
+          "      var smartDims = readImageDimensions(file);",
+          "      pixelWidth = smartDims.width;",
+          "      pixelHeight = smartDims.height;",
+          "      app.activeDocument = doc;",
+          "      duplicated = placeSmartObject(file);",
+          "    } else {",
+          "      var source = app.open(file);",
+          "      pixelWidth = unitToPx(source.width);",
+          "      pixelHeight = unitToPx(source.height);",
+          "      var sourceLayer = source.activeLayer;",
+          "      try { sourceLayer.name = layerInfo.name; } catch (sourceNameError) {}",
+          "      duplicated = sourceLayer.duplicate(doc, ElementPlacement.PLACEATBEGINNING);",
+          "      source.close(SaveOptions.DONOTSAVECHANGES);",
+          "    }",
           "",
           "    app.activeDocument = doc;",
           "    doc.activeLayer = duplicated;",
           "    duplicated.name = layerInfo.name;",
           "    try { duplicated.opacity = layerInfo.opacity; } catch (opacityError) {}",
+          "    layerInfo.pixelWidth = Math.max(1, Math.round(numberOr(pixelWidth, layerInfo.sourceWidth)));",
+          "    layerInfo.pixelHeight = Math.max(1, Math.round(numberOr(pixelHeight, layerInfo.sourceHeight)));",
           "",
           "    var bounds = layerBounds(duplicated);",
           "    if (bounds.empty) return;",
@@ -1130,6 +1252,49 @@
           "",
           "    var center = layerCenter(duplicated);",
           "    duplicated.translate(UnitValue(layerInfo.x - center.x, \"px\"), UnitValue(layerInfo.y - center.y, \"px\"));",
+          "  }",
+          "",
+          "  function placeSmartObject(file) {",
+          "    var desc = new ActionDescriptor();",
+          "    desc.putPath(charIDToTypeID(\"null\"), file);",
+          "    desc.putEnumerated(charIDToTypeID(\"FTcs\"), charIDToTypeID(\"QCSt\"), charIDToTypeID(\"Qcsa\"));",
+          "    executeAction(charIDToTypeID(\"Plc \"), desc, DialogModes.NO);",
+          "    return app.activeDocument.activeLayer;",
+          "  }",
+          "",
+          "  function readImageDimensions(file) {",
+          "    var source = app.open(file);",
+          "    var dims = { width: unitToPx(source.width), height: unitToPx(source.height) };",
+          "    source.close(SaveOptions.DONOTSAVECHANGES);",
+          "    return dims;",
+          "  }",
+          "",
+          "  function writeRoundtripMetadata(doc, manifest) {",
+          "    app.activeDocument = doc;",
+          "    var lines = [];",
+          "    for (var i = 0; i < manifest.layers.length; i++) {",
+          "      var layer = manifest.layers[i];",
+          "      lines.push([",
+          "        encodeMetaField(layer.name),",
+          "        encodeMetaField(layer.image),",
+          "        Math.max(1, Math.round(numberOr(layer.pixelWidth, layer.sourceWidth))),",
+          "        Math.max(1, Math.round(numberOr(layer.pixelHeight, layer.sourceHeight))),",
+          "        numberOr(layer.width, 1),",
+          "        numberOr(layer.height, 1),",
+          "        numberOr(layer.rotation, 0)",
+          "      ].join(\"\\t\"));",
+          "    }",
+          "    var metaLayer = doc.artLayers.add();",
+          "    metaLayer.kind = LayerKind.TEXT;",
+          "    metaLayer.name = \"__spine_roundtrip_manifest__\";",
+          "    metaLayer.textItem.contents = \"__SPINE_ROUNDTRIP_MANIFEST_V1__\\r\" + lines.join(\"\\r\");",
+          "    try { metaLayer.textItem.size = 8; } catch (sizeError) {}",
+          "    try { metaLayer.textItem.position = [UnitValue(0, \"px\"), UnitValue(0, \"px\")]; } catch (positionError) {}",
+          "    metaLayer.visible = false;",
+          "  }",
+          "",
+          "  function encodeMetaField(value) {",
+          "    return encodeURIComponent(String(value == null ? \"\" : value));",
           "  }",
           "",
           "  function layerBounds(layer) {",
@@ -1182,6 +1347,344 @@
           "        }",
           "      }",
           "    }",
+          "  }",
+          "",
+          "  function numberOr(value, fallback) {",
+          "    var n = Number(value);",
+          "    return isFinite(n) ? n : fallback;",
+          "  }",
+          "",
+          "  function unitToPx(value) {",
+          "    var n = value && value.as ? value.as(\"px\") : Number(value);",
+          "    return Math.max(1, Math.round(numberOr(n, 1)));",
+          "  }",
+          "}());",
+          ""
+        ].join("\n");
+      }
+
+      function buildReverseJsx(manifest) {
+        var compact = {
+          name: manifest.name,
+          smartObjects: !!manifest.smartObjects,
+          layers: manifest.layers.map(function (layer) {
+            return {
+              order: layer.order,
+              name: layer.name,
+              image: layer.image,
+              output: "images/" + safeOutputPath(layer.image) + ".png",
+              sourceWidth: layer.sourceWidth || layer.width,
+              sourceHeight: layer.sourceHeight || layer.height,
+              width: layer.width,
+              height: layer.height,
+              rotation: layer.rotation
+            };
+          })
+        };
+        return [
+          "#target photoshop",
+          "",
+          "(function () {",
+          "  var manifest = " + JSON.stringify(compact, null, 2).replace(/\n/g, "\n  ") + ";",
+          "  var oldUnits = app.preferences.rulerUnits;",
+          "  app.preferences.rulerUnits = Units.PIXELS;",
+          "  app.displayDialogs = DialogModes.NO;",
+          "",
+          "  if (!app.documents.length) {",
+          "    alert(\"Open the PSD generated by the build JSX before running this reverse exporter.\");",
+          "    app.preferences.rulerUnits = oldUnits;",
+          "    return;",
+          "  }",
+          "",
+          "  var sourceDoc = app.activeDocument;",
+          "  var outputRoot = Folder.selectDialog(\"Select a folder to receive exported Spine images\");",
+          "  if (!outputRoot) {",
+          "    app.preferences.rulerUnits = oldUnits;",
+          "    return;",
+          "  }",
+          "",
+          "  var referenceFolder = Folder.selectDialog(\"Select original unpacked images folder for exact canvas sizes (Cancel to use PSD metadata or JSON sizes)\");",
+          "  var referenceMap = {};",
+          "  var referenceSizeCache = {};",
+          "  if (referenceFolder) indexFolder(referenceFolder, referenceMap, 0);",
+          "",
+          "  var layers = [];",
+          "  collectLayers(sourceDoc, layers);",
+          "  var embeddedMetadata = readRoundtripMetadata(sourceDoc);",
+          "  var usedLayerIndexes = {};",
+          "  var writtenOutputs = {};",
+          "  var exported = [];",
+          "  var missing = [];",
+          "  var failed = [];",
+          "  var inverseTransformed = [];",
+          "  var duplicates = [];",
+          "  var sizeFromMetadata = 0;",
+          "  var sizeFromReference = 0;",
+          "  var sizeFromJson = 0;",
+          "",
+          "  for (var i = 0; i < manifest.layers.length; i++) {",
+          "    var info = manifest.layers[i];",
+          "    if (writtenOutputs[info.output]) {",
+          "      duplicates.push(info.output);",
+          "      continue;",
+          "    }",
+          "    var sizeSource = resolveSourceSize(info, sourceDoc, embeddedMetadata, referenceFolder, referenceMap, referenceSizeCache);",
+          "    if (sizeSource === \"metadata\") sizeFromMetadata++;",
+          "    else if (sizeSource === \"reference\") sizeFromReference++;",
+          "    else sizeFromJson++;",
+          "    var layer = findLayer(layers, info.name, usedLayerIndexes);",
+          "    if (!layer) {",
+          "      missing.push(info.name + \" -> \" + info.output);",
+          "      continue;",
+          "    }",
+          "    try {",
+          "      var outFile = makeOutputFile(outputRoot, info.output);",
+          "      exportRasterLayer(sourceDoc, layer, info, outFile);",
+          "      inverseTransformed.push(info.name);",
+          "      writtenOutputs[info.output] = true;",
+          "      exported.push(info.output);",
+          "    } catch (exportError) {",
+          "      failed.push(info.name + \": \" + exportError);",
+          "    }",
+          "  }",
+          "",
+          "  app.activeDocument = sourceDoc;",
+          "  app.preferences.rulerUnits = oldUnits;",
+          "  var report = [\"Exported images: \" + exported.length];",
+          "  if (missing.length) report.push(\"Missing layers:\\n\" + missing.slice(0, 20).join(\"\\n\") + (missing.length > 20 ? \"\\n...\" : \"\"));",
+          "  if (failed.length) report.push(\"Failed layers:\\n\" + failed.slice(0, 20).join(\"\\n\") + (failed.length > 20 ? \"\\n...\" : \"\"));",
+          "  report.push(\"Source canvas sizes: PSD metadata \" + sizeFromMetadata + \", reference images \" + sizeFromReference + \", JSON fallback \" + sizeFromJson);",
+          "  if (inverseTransformed.length) report.push(\"Layers were inverse-transformed from current PSD pixels by recorded name/size/rotation:\\n\" + inverseTransformed.slice(0, 20).join(\"\\n\") + (inverseTransformed.length > 20 ? \"\\n...\" : \"\"));",
+          "  if (duplicates.length) report.push(\"Skipped duplicate output paths:\\n\" + duplicates.slice(0, 20).join(\"\\n\") + (duplicates.length > 20 ? \"\\n...\" : \"\"));",
+          "  alert(report.join(\"\\n\\n\"));",
+          "",
+          "  function collectLayers(container, out) {",
+          "    for (var i = 0; i < container.layers.length; i++) {",
+          "      var layer = container.layers[i];",
+          "      if (layer.typename === \"ArtLayer\") {",
+          "        out.push(layer);",
+          "      } else if (layer.typename === \"LayerSet\") {",
+          "        collectLayers(layer, out);",
+          "      }",
+          "    }",
+          "  }",
+          "",
+          "  function findLayer(layers, name, used) {",
+          "    for (var i = 0; i < layers.length; i++) {",
+          "      if (!used[i] && layers[i].name === name) {",
+          "        used[i] = true;",
+          "        return layers[i];",
+          "      }",
+          "    }",
+          "    var lower = String(name).toLowerCase();",
+          "    for (var j = 0; j < layers.length; j++) {",
+          "      if (!used[j] && String(layers[j].name).toLowerCase() === lower) {",
+          "        used[j] = true;",
+          "        return layers[j];",
+          "      }",
+          "    }",
+          "    return null;",
+          "  }",
+          "",
+          "  function resolveSourceSize(info, sourceDoc, metadata, referenceFolder, referenceMap, cache) {",
+          "    var meta = metadata.byName[info.name] || metadata.byImage[String(info.image).toLowerCase()];",
+          "    if (meta && meta.pixelWidth > 0 && meta.pixelHeight > 0) {",
+          "      info.pixelWidth = meta.pixelWidth;",
+          "      info.pixelHeight = meta.pixelHeight;",
+          "      return \"metadata\";",
+          "    }",
+          "    if (referenceFolder) {",
+          "      var key = String(info.image).toLowerCase();",
+          "      if (!cache[key]) {",
+          "        var file = findImage(referenceFolder, referenceMap, info.image);",
+          "        if (file && file.exists) {",
+          "          try { cache[key] = readImageDimensions(file); } catch (dimensionError) { cache[key] = { failed: true }; }",
+          "          app.activeDocument = sourceDoc;",
+          "        } else {",
+          "          cache[key] = { failed: true };",
+          "        }",
+          "      }",
+          "      if (cache[key] && !cache[key].failed && cache[key].width > 0 && cache[key].height > 0) {",
+          "        info.pixelWidth = cache[key].width;",
+          "        info.pixelHeight = cache[key].height;",
+          "        return \"reference\";",
+          "      }",
+          "    }",
+          "    info.pixelWidth = Math.max(1, Math.round(numberOr(info.sourceWidth, info.width)));",
+          "    info.pixelHeight = Math.max(1, Math.round(numberOr(info.sourceHeight, info.height)));",
+          "    return \"json\";",
+          "  }",
+          "",
+          "  function readRoundtripMetadata(doc) {",
+          "    var result = { byName: {}, byImage: {} };",
+          "    var metaLayers = [];",
+          "    collectMetadataLayers(doc, metaLayers);",
+          "    for (var i = 0; i < metaLayers.length; i++) {",
+          "      var layer = metaLayers[i];",
+          "      var text = \"\";",
+          "      try { text = String(layer.textItem.contents || \"\"); } catch (textError) { text = \"\"; }",
+          "      parseMetadataText(text, result);",
+          "    }",
+          "    return result;",
+          "  }",
+          "",
+          "  function collectMetadataLayers(container, out) {",
+          "    for (var i = 0; i < container.layers.length; i++) {",
+          "      var layer = container.layers[i];",
+          "      if (layer.typename === \"ArtLayer\") {",
+          "        if (layer.name === \"__spine_roundtrip_manifest__\") out.push(layer);",
+          "      } else if (layer.typename === \"LayerSet\") {",
+          "        collectMetadataLayers(layer, out);",
+          "      }",
+          "    }",
+          "  }",
+          "",
+          "  function parseMetadataText(text, result) {",
+          "    var lines = String(text || \"\").split(/\\r\\n|\\n|\\r/);",
+          "    if (!lines.length || lines[0] !== \"__SPINE_ROUNDTRIP_MANIFEST_V1__\") return;",
+          "    for (var i = 1; i < lines.length; i++) {",
+          "      if (!lines[i]) continue;",
+          "      var parts = lines[i].split(\"\\t\");",
+          "      if (parts.length < 4) continue;",
+          "      try {",
+          "        var item = {",
+          "          name: decodeURIComponent(parts[0]),",
+          "          image: decodeURIComponent(parts[1]),",
+          "          pixelWidth: Math.max(1, Math.round(numberOr(parts[2], 0))),",
+          "          pixelHeight: Math.max(1, Math.round(numberOr(parts[3], 0)))",
+          "        };",
+          "        if (item.name) result.byName[item.name] = item;",
+          "        if (item.image) result.byImage[String(item.image).toLowerCase()] = item;",
+          "      } catch (parseError) {}",
+          "    }",
+          "  }",
+          "",
+          "  function exportRasterLayer(sourceDoc, layer, info, outFile) {",
+          "    app.activeDocument = sourceDoc;",
+          "    var oldVisible = layer.visible;",
+          "    layer.visible = true;",
+          "    sourceDoc.activeLayer = layer;",
+          "    var bounds = layerBounds(layer);",
+          "    if (bounds.empty) throw new Error(\"empty layer\");",
+          "    var targetWidth = Math.max(1, Math.round(numberOr(info.pixelWidth, numberOr(info.sourceWidth, info.width))));",
+          "    var targetHeight = Math.max(1, Math.round(numberOr(info.pixelHeight, numberOr(info.sourceHeight, info.height))));",
+          "    var placedWidth = Math.max(1, numberOr(info.width, targetWidth));",
+          "    var placedHeight = Math.max(1, numberOr(info.height, targetHeight));",
+          "    var layerWidth = Math.max(1, bounds.right - bounds.left);",
+          "    var layerHeight = Math.max(1, bounds.bottom - bounds.top);",
+          "    var safeSize = Math.ceil(Math.max(targetWidth, targetHeight, layerWidth, layerHeight) * 3 + 96);",
+          "    var temp = app.documents.add(safeSize, safeSize, 72, \"export_\" + cleanName(layer.name), NewDocumentMode.RGB, DocumentFill.TRANSPARENT);",
+          "    app.activeDocument = sourceDoc;",
+          "    sourceDoc.activeLayer = layer;",
+          "    var copy = layer.duplicate(temp, ElementPlacement.PLACEATBEGINNING);",
+          "    app.activeDocument = temp;",
+          "    temp.activeLayer = copy;",
+          "    centerLayer(copy, safeSize / 2, safeSize / 2);",
+          "    var rotation = numberOr(info.rotation, 0);",
+          "    if (Math.abs(rotation) > 0.001) {",
+          "      copy.rotate(-rotation, AnchorPosition.MIDDLECENTER);",
+          "    }",
+          "    var scaleX = targetWidth / placedWidth * 100;",
+          "    var scaleY = targetHeight / placedHeight * 100;",
+          "    if (isFinite(scaleX) && isFinite(scaleY) && scaleX > 0 && scaleY > 0) {",
+          "      copy.resize(scaleX, scaleY, AnchorPosition.MIDDLECENTER);",
+          "    }",
+          "    centerLayer(copy, safeSize / 2, safeSize / 2);",
+          "    var left = Math.round((safeSize - targetWidth) / 2);",
+          "    var top = Math.round((safeSize - targetHeight) / 2);",
+          "    temp.crop([UnitValue(left, \"px\"), UnitValue(top, \"px\"), UnitValue(left + targetWidth, \"px\"), UnitValue(top + targetHeight, \"px\")]);",
+          "    savePng(temp, outFile);",
+          "    temp.close(SaveOptions.DONOTSAVECHANGES);",
+          "    app.activeDocument = sourceDoc;",
+          "    try { layer.visible = oldVisible; } catch (restoreError) {}",
+          "  }",
+          "",
+          "  function savePng(doc, file) {",
+          "    var options = new PNGSaveOptions();",
+          "    options.interlaced = false;",
+          "    doc.saveAs(file, options, true, Extension.LOWERCASE);",
+          "  }",
+          "",
+          "  function makeOutputFile(root, relPath) {",
+          "    var parts = String(relPath).replace(/\\\\/g, \"/\").split(\"/\");",
+          "    var folder = root;",
+          "    for (var i = 0; i < parts.length - 1; i++) {",
+          "      if (!parts[i]) continue;",
+          "      folder = new Folder(folder.fsName + \"/\" + parts[i]);",
+          "      if (!folder.exists && !folder.create()) {",
+          "        throw new Error(\"Cannot create folder \" + folder.fsName);",
+          "      }",
+          "    }",
+          "    return new File(folder.fsName + \"/\" + parts[parts.length - 1]);",
+          "  }",
+          "",
+          "  function layerBounds(layer) {",
+          "    var b = layer.bounds;",
+          "    var left = b[0].as(\"px\");",
+          "    var top = b[1].as(\"px\");",
+          "    var right = b[2].as(\"px\");",
+          "    var bottom = b[3].as(\"px\");",
+          "    return { left: left, top: top, right: right, bottom: bottom, empty: right <= left || bottom <= top };",
+          "  }",
+          "",
+          "  function layerCenter(layer) {",
+          "    var b = layerBounds(layer);",
+          "    return { x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 };",
+          "  }",
+          "",
+          "  function centerLayer(layer, x, y) {",
+          "    var center = layerCenter(layer);",
+          "    layer.translate(UnitValue(x - center.x, \"px\"), UnitValue(y - center.y, \"px\"));",
+          "  }",
+          "",
+          "  function findImage(folder, fileMap, imageName) {",
+          "    var rel = String(imageName).replace(/\\\\/g, \"/\");",
+          "    var direct = new File(folder.fsName + \"/\" + rel);",
+          "    if (direct.exists) return direct;",
+          "    direct = new File(folder.fsName + \"/\" + rel + \".png\");",
+          "    if (direct.exists) return direct;",
+          "    direct = new File(folder.fsName + \"/\" + rel + \".PNG\");",
+          "    if (direct.exists) return direct;",
+          "    var base = rel.substring(rel.lastIndexOf(\"/\") + 1).toLowerCase().replace(/\\.[^.]+$/, \"\");",
+          "    return fileMap[base] || null;",
+          "  }",
+          "",
+          "  function indexFolder(folder, map, depth) {",
+          "    if (depth > 8) return;",
+          "    var items = folder.getFiles();",
+          "    for (var i = 0; i < items.length; i++) {",
+          "      var item = items[i];",
+          "      if (item instanceof Folder) {",
+          "        indexFolder(item, map, depth + 1);",
+          "      } else {",
+          "        var lower = decodeURI(item.name).toLowerCase();",
+          "        if (/\\.(png|jpg|jpeg|tif|tiff)$/.test(lower)) {",
+          "          var base = lower.replace(/\\.[^.]+$/, \"\");",
+          "          if (!map[base]) map[base] = item;",
+          "        }",
+          "      }",
+          "    }",
+          "  }",
+          "",
+          "  function readImageDimensions(file) {",
+          "    var source = app.open(file);",
+          "    var dims = { width: unitToPx(source.width), height: unitToPx(source.height) };",
+          "    source.close(SaveOptions.DONOTSAVECHANGES);",
+          "    return dims;",
+          "  }",
+          "",
+          "  function numberOr(value, fallback) {",
+          "    var n = Number(value);",
+          "    return isFinite(n) ? n : fallback;",
+          "  }",
+          "",
+          "  function unitToPx(value) {",
+          "    var n = value && value.as ? value.as(\"px\") : Number(value);",
+          "    return Math.max(1, Math.round(numberOr(n, 1)));",
+          "  }",
+          "",
+          "  function cleanName(value) {",
+          "    return String(value || \"layer\").replace(/[\\\\\\/:*?\"<>|]+/g, \"_\").slice(0, 40) || \"layer\";",
           "  }",
           "}());",
           ""
@@ -1296,6 +1799,20 @@
           .trim() || "spine_rebuild";
       }
 
+      function safeOutputPath(value) {
+        var normalized = stripKnownImageExtension(value).replace(/\\/g, "/");
+        return normalized.split("/")
+          .map(function (part) {
+            return String(part || "")
+              .replace(/[\\/:*?"<>|]+/g, "_")
+              .trim();
+          })
+          .filter(function (part) {
+            return part && part !== "." && part !== "..";
+          })
+          .join("/") || "layer";
+      }
+
       function escapeHtml(value) {
         return String(value).replace(/[&<>"']/g, function (char) {
           return {
@@ -1310,7 +1827,8 @@
 
       window.SpineJsonToPhotoshopJsx = {
         buildManifest: buildManifest,
-        buildJsx: buildJsx
+        buildJsx: buildJsx,
+        buildReverseJsx: buildReverseJsx
       };
     }());
   </script>

@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spine 切图还原图集工具</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7f8;
+      --panel: #ffffff;
+      --ink: #1f2933;
+      --muted: #667085;
+      --line: #d7dee7;
+      --accent: #1f7a8c;
+      --accent-dark: #165c6a;
+      --ok: #23765a;
+      --warn: #9a6a13;
+      --bad: #b42318;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      padding: 24px;
+      border-right: 1px solid var(--line);
+      background: #fff;
+    }
+
+    main {
+      padding: 24px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    h1, h2, p { margin: 0; }
+    h1 { font-size: 26px; line-height: 1.15; letter-spacing: 0; }
+    h2 { font-size: 16px; letter-spacing: 0; }
+
+    .stack { display: grid; gap: 14px; }
+    .muted { color: var(--muted); font-size: 13px; }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 16px;
+    }
+
+    .field { display: grid; gap: 7px; }
+    .field label { font-size: 13px; color: var(--muted); }
+
+    input[type="file"],
+    select {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      padding: 8px 10px;
+    }
+
+    .check {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--accent-dark); }
+    button:disabled { cursor: not-allowed; opacity: 0.55; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 20px;
+      line-height: 1.15;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .messages {
+      display: grid;
+      gap: 8px;
+    }
+
+    .message {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .message.ok { border-color: #b9dfcf; color: var(--ok); background: #f0faf5; }
+    .message.warn { border-color: #f0d89e; color: var(--warn); background: #fff8e8; }
+    .message.bad { border-color: #f4b8b0; color: var(--bad); background: #fff1ef; }
+
+    .preview-wrap {
+      overflow: auto;
+      max-height: 420px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #dfe5eb;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      image-rendering: auto;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 360px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    td.name {
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="stack">
+      <div class="stack">
+        <h1>Spine 切图还原图集</h1>
+        <p class="muted">把修改后的 images 切图按原 `.atlas` 的 xy / size / rotate / orig / offset 烘回 page PNG，用于直接替换原图集。</p>
+      </div>
+
+      <section class="panel stack">
+        <h2>1. 原 atlas</h2>
+        <div class="field">
+          <label for="atlasInput">选择 `.atlas`</label>
+          <input id="atlasInput" type="file" accept=".atlas,text/plain">
+        </div>
+      </section>
+
+      <section class="panel stack">
+        <h2>2. 原 page PNG</h2>
+        <div class="field">
+          <label for="pageInput">选择一张/多张原图集 PNG</label>
+          <input id="pageInput" type="file" multiple accept=".png,image/png">
+        </div>
+        <label class="check">
+          <input id="preserveBase" type="checkbox" checked>
+          使用原图集为底，只覆盖找到的切图区域
+        </label>
+      </section>
+
+      <section class="panel stack">
+        <h2>3. 修改后的切图</h2>
+        <div class="field">
+          <label for="sliceFolderInput">选择 images 文件夹或解压后的 ZIP 目录</label>
+          <input id="sliceFolderInput" type="file" webkitdirectory directory multiple>
+        </div>
+        <div class="field">
+          <label for="sliceFilesInput">或选择 PNG 切图与 atlas_manifest.json</label>
+          <input id="sliceFilesInput" type="file" multiple accept=".png,.json">
+        </div>
+      </section>
+
+      <section class="panel stack">
+        <h2>4. 回填设置</h2>
+        <div class="field">
+          <label for="sourceMode">切图坐标类型</label>
+          <select id="sourceMode">
+            <option value="auto">自动识别（推荐）</option>
+            <option value="orig">orig / offset 透明画布</option>
+            <option value="trimmed">已裁掉透明边的 region</option>
+            <option value="stretch">强制缩放到 region 尺寸</option>
+          </select>
+        </div>
+        <label class="check">
+          <input id="clearRegion" type="checkbox" checked>
+          覆盖前清空原 region 区域
+        </label>
+      </section>
+
+      <button id="buildButton" disabled>生成还原图集 ZIP</button>
+    </aside>
+
+    <main>
+      <section class="stats">
+        <div class="stat"><span class="muted">Atlas</span><strong id="atlasStat">-</strong></div>
+        <div class="stat"><span class="muted">Page</span><strong id="pageStat">0</strong></div>
+        <div class="stat"><span class="muted">切图</span><strong id="sliceStat">0</strong></div>
+        <div class="stat"><span class="muted">Manifest</span><strong id="manifestStat">无</strong></div>
+      </section>
+
+      <section class="messages" id="messages">
+        <div class="message">等待导入 atlas、原 page PNG 和修改后的切图。</div>
+      </section>
+
+      <section class="panel stack">
+        <h2>第一张图集预览</h2>
+        <div class="preview-wrap">
+          <canvas id="previewCanvas" width="1" height="1"></canvas>
+        </div>
+      </section>
+
+      <section class="panel stack">
+        <h2>回填明细</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Region</th>
+                <th>Page</th>
+                <th>Slice</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody id="regionRows">
+              <tr><td colspan="5">等待生成</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var state = {
+        atlasFile: null,
+        atlas: null,
+        pageFiles: [],
+        pageFileMap: {},
+        sliceFiles: [],
+        sliceMap: {},
+        manifest: null,
+        manifestByRegion: {},
+        zipBlob: null
+      };
+
+      var els = {
+        atlasInput: document.getElementById("atlasInput"),
+        pageInput: document.getElementById("pageInput"),
+        sliceFolderInput: document.getElementById("sliceFolderInput"),
+        sliceFilesInput: document.getElementById("sliceFilesInput"),
+        preserveBase: document.getElementById("preserveBase"),
+        sourceMode: document.getElementById("sourceMode"),
+        clearRegion: document.getElementById("clearRegion"),
+        buildButton: document.getElementById("buildButton"),
+        atlasStat: document.getElementById("atlasStat"),
+        pageStat: document.getElementById("pageStat"),
+        sliceStat: document.getElementById("sliceStat"),
+        manifestStat: document.getElementById("manifestStat"),
+        messages: document.getElementById("messages"),
+        previewCanvas: document.getElementById("previewCanvas"),
+        regionRows: document.getElementById("regionRows")
+      };
+
+      els.atlasInput.addEventListener("change", function () {
+        if (els.atlasInput.files && els.atlasInput.files[0]) readAtlas(els.atlasInput.files[0]);
+      });
+
+      els.pageInput.addEventListener("change", function () {
+        setPageFiles(els.pageInput.files);
+      });
+
+      els.sliceFolderInput.addEventListener("change", function () {
+        setSliceFiles(els.sliceFolderInput.files);
+      });
+
+      els.sliceFilesInput.addEventListener("change", function () {
+        setSliceFiles(els.sliceFilesInput.files);
+      });
+
+      els.preserveBase.addEventListener("change", updateReadyState);
+      els.buildButton.addEventListener("click", function () {
+        rebuildAtlas().catch(function (error) {
+          renderMessages([{ type: "bad", text: error.message || String(error) }]);
+          updateReadyState();
+        });
+      });
+
+      async function readAtlas(file) {
+        try {
+          state.atlasFile = file;
+          state.atlas = parseAtlas(await file.text());
+          state.zipBlob = null;
+          renderMessages([{ type: "ok", text: "已读取 atlas：" + state.atlas.regions.length + " 个 region，" + state.atlas.pages.length + " 张 page。" }]);
+        } catch (error) {
+          state.atlasFile = null;
+          state.atlas = null;
+          renderMessages([{ type: "bad", text: "Atlas 解析失败：" + error.message }]);
+        }
+        renderStats();
+        updateReadyState();
+      }
+
+      function setPageFiles(fileList) {
+        state.pageFiles = Array.from(fileList || []).filter(isPngFile);
+        state.pageFileMap = {};
+        state.pageFiles.forEach(function (file) {
+          var path = filePath(file);
+          addPageKey(path, file);
+          addPageKey(file.name, file);
+        });
+        renderStats();
+        renderMessages([{ type: state.pageFiles.length ? "ok" : "warn", text: "已选择原 page PNG：" + state.pageFiles.length + " 张。" }]);
+        updateReadyState();
+      }
+
+      async function setSliceFiles(fileList) {
+        var files = Array.from(fileList || []);
+        state.sliceFiles = files.filter(isPngFile);
+        state.sliceMap = {};
+        state.manifest = null;
+        state.manifestByRegion = {};
+
+        state.sliceFiles.forEach(indexSliceFile);
+        var manifestFile = files.find(function (file) {
+          return /(^|\/)atlas_manifest\.json$/i.test(filePath(file));
+        }) || files.find(function (file) {
+          return /\.json$/i.test(file.name || "");
+        });
+
+        if (manifestFile) {
+          try {
+            state.manifest = JSON.parse(await manifestFile.text());
+            buildManifestIndex(state.manifest);
+          } catch (error) {
+            renderMessages([{ type: "warn", text: "Manifest 解析失败，将仅按文件名匹配：" + error.message }]);
+          }
+        }
+
+        renderStats();
+        renderMessages([{
+          type: state.sliceFiles.length ? "ok" : "warn",
+          text: "已选择修改切图：" + state.sliceFiles.length + " 张" + (state.manifest ? "，已读取 atlas_manifest.json。" : "，未读取 manifest。")
+        }]);
+        updateReadyState();
+      }
+
+      function buildManifestIndex(manifest) {
+        state.manifestByRegion = {};
+        (manifest.regions || []).forEach(function (region) {
+          if (region && region.name) state.manifestByRegion[region.name] = region;
+        });
+      }
+
+      async function rebuildAtlas() {
+        if (!state.atlas) throw new Error("请先选择 .atlas。");
+        if (!state.sliceFiles.length) throw new Error("请先选择修改后的切图。");
+
+        els.buildButton.disabled = true;
+        renderMessages([{ type: "ok", text: "正在回填图集..." }]);
+
+        var pageCanvases = await buildPageCanvases();
+        var report = {
+          used: [],
+          missing: [],
+          scaled: [],
+          pagesWithoutImage: []
+        };
+
+        for (var i = 0; i < state.atlas.regions.length; i++) {
+          var region = state.atlas.regions[i];
+          var pageCanvas = pageCanvases[region.page.name];
+          if (!pageCanvas) {
+            report.missing.push({ region: region.name, reason: "missing page " + region.page.name });
+            continue;
+          }
+
+          var slice = findSliceForRegion(region);
+          if (!slice) {
+            report.missing.push({ region: region.name, reason: "missing slice" });
+            continue;
+          }
+
+          var image = await loadImage(slice.file);
+          var normalized = makeTrimmedCanvas(image, region, els.sourceMode.value);
+          if (normalized.scaled) report.scaled.push(region.name);
+          drawRegionToAtlas(pageCanvas.canvas, normalized.canvas, region);
+          report.used.push({
+            region: region.name,
+            page: region.page.name,
+            slice: filePath(slice.file),
+            mode: normalized.mode,
+            scaled: normalized.scaled
+          });
+          if (i % 12 === 0) await sleep(0);
+        }
+
+        var zipFiles = [];
+        for (var p = 0; p < state.atlas.pages.length; p++) {
+          var page = state.atlas.pages[p];
+          var pageData = pageCanvases[page.name];
+          if (!pageData) continue;
+          zipFiles.push({
+            name: normalizePath(page.name),
+            blob: await canvasToBlob(pageData.canvas)
+          });
+        }
+        zipFiles.push({
+          name: "spine_atlas_rebuild_report.json",
+          blob: new Blob([JSON.stringify({
+            tool: "Spine images to atlas rebuilder",
+            generatedAt: new Date().toISOString(),
+            sourceAtlas: state.atlasFile ? state.atlasFile.name : "",
+            preserveBase: els.preserveBase.checked,
+            sourceMode: els.sourceMode.value,
+            clearRegion: els.clearRegion.checked,
+            manifest: !!state.manifest,
+            report: report
+          }, null, 2)], { type: "application/json" })
+        });
+        zipFiles.push({
+          name: "README.txt",
+          blob: new Blob([[
+            "Spine rebuilt atlas package",
+            "",
+            "The PNG paths match the page names in the original .atlas file.",
+            "Copy these PNG files into a duplicate Spine export folder to replace the original atlas textures.",
+            "The .atlas file itself does not need to be changed as long as image dimensions and page names stay the same."
+          ].join("\r\n")], { type: "text/plain" })
+        });
+
+        state.zipBlob = await createZip(zipFiles);
+        downloadBlob(state.zipBlob, atlasBaseName() + "_rebuilt_atlas.zip");
+        previewFirstPage(pageCanvases);
+        renderRows(report);
+
+        var messages = [{ type: "ok", text: "已生成还原图集 ZIP。回填 " + report.used.length + " 项，缺失 " + report.missing.length + " 项。" }];
+        if (report.scaled.length) {
+          messages.push({ type: "warn", text: "有 " + report.scaled.length + " 张切图尺寸不匹配，已缩放到 region 尺寸；若来自姿势 PSD 的普通图层导出，角度可能仍需用原始切图或智能对象内容导出。" });
+        }
+        if (report.missing.length) {
+          messages.push({ type: "warn", text: "缺失切图会保留原 page 底图；如果未启用原图集为底，则这些区域会保持透明。" });
+        }
+        renderMessages(messages);
+        updateReadyState();
+      }
+
+      async function buildPageCanvases() {
+        var result = {};
+        for (var i = 0; i < state.atlas.pages.length; i++) {
+          var page = state.atlas.pages[i];
+          var file = findPageFile(page);
+          var image = file ? await loadImage(file) : null;
+          var width = image ? image.width : page.width;
+          var height = image ? image.height : page.height;
+          if (!width || !height) throw new Error("Page 缺少尺寸且没有对应 PNG：" + page.name);
+
+          var canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          var ctx = canvas.getContext("2d");
+          ctx.imageSmoothingEnabled = false;
+          if (image && els.preserveBase.checked) {
+            ctx.drawImage(image, 0, 0);
+          }
+          result[page.name] = { canvas: canvas, image: image };
+        }
+        return result;
+      }
+
+      function findSliceForRegion(region) {
+        var candidates = [];
+        var manifestRegion = state.manifestByRegion[region.name];
+        if (manifestRegion && manifestRegion.outputs) {
+          manifestRegion.outputs.forEach(function (output) {
+            candidates.push(output.path);
+            candidates.push(output.fileName);
+          });
+        }
+        candidates.push("images/" + safeName(region.name) + ".png");
+        candidates.push(safeName(region.name) + ".png");
+        candidates.push(region.name + ".png");
+        candidates.push(region.name);
+
+        for (var i = 0; i < candidates.length; i++) {
+          var found = state.sliceMap[imageKey(candidates[i])];
+          if (found) return found;
+        }
+        return null;
+      }
+
+      function makeTrimmedCanvas(image, region, mode) {
+        var origWidth = region.origWidth || region.width;
+        var origHeight = region.origHeight || region.height;
+        var useOrig = mode === "orig";
+        var scaled = false;
+
+        if (mode === "auto") {
+          useOrig = image.width === origWidth && image.height === origHeight &&
+            (origWidth !== region.width || origHeight !== region.height || region.offsetX || region.offsetY);
+        }
+
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, region.width);
+        canvas.height = Math.max(1, region.height);
+        var ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = mode === "stretch";
+
+        if (useOrig) {
+          var sx = clamp(region.offsetX || 0, 0, Math.max(0, image.width - 1));
+          var sy = clamp(image.height - (region.offsetY || 0) - region.height, 0, Math.max(0, image.height - 1));
+          var sw = Math.min(region.width, image.width - sx);
+          var sh = Math.min(region.height, image.height - sy);
+          ctx.drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
+          return { canvas: canvas, mode: "orig", scaled: false };
+        }
+
+        if (image.width === region.width && image.height === region.height && mode !== "stretch") {
+          ctx.drawImage(image, 0, 0);
+          return { canvas: canvas, mode: "trimmed", scaled: false };
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, region.width, region.height);
+        scaled = image.width !== region.width || image.height !== region.height;
+        return { canvas: canvas, mode: "stretch", scaled: scaled };
+      }
+
+      function drawRegionToAtlas(pageCanvas, trimmed, region) {
+        var ctx = pageCanvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
+        var packedWidth = region.rotate ? region.height : region.width;
+        var packedHeight = region.rotate ? region.width : region.height;
+        if (els.clearRegion.checked) {
+          ctx.clearRect(region.x, region.y, packedWidth, packedHeight);
+        }
+
+        ctx.save();
+        ctx.translate(region.x, region.y);
+        if (region.rotate) {
+          ctx.translate(0, region.width);
+          ctx.rotate(-Math.PI / 2);
+          ctx.drawImage(trimmed, 0, 0, region.width, region.height);
+        } else {
+          ctx.drawImage(trimmed, 0, 0, region.width, region.height);
+        }
+        ctx.restore();
+      }
+
+      function addPageKey(path, file) {
+        state.pageFileMap[stripExtension(normalizePath(path)).toLowerCase()] = file;
+        state.pageFileMap[stripExtension(basename(path)).toLowerCase()] = file;
+      }
+
+      function findPageFile(page) {
+        var key = stripExtension(normalizePath(page.name)).toLowerCase();
+        return state.pageFileMap[key] || state.pageFileMap[stripExtension(basename(page.name)).toLowerCase()] || null;
+      }
+
+      function indexSliceFile(file) {
+        var path = normalizePath(filePath(file));
+        var parts = path.split("/");
+        for (var i = 0; i < parts.length; i++) {
+          var suffix = parts.slice(i).join("/");
+          addSliceKey(suffix, file);
+        }
+        addSliceKey(file.name, file);
+      }
+
+      function addSliceKey(path, file) {
+        var key = imageKey(path);
+        if (key && !state.sliceMap[key]) state.sliceMap[key] = { file: file };
+      }
+
+      function imageKey(path) {
+        return stripExtension(normalizePath(path)).replace(/^\.?\//, "").toLowerCase();
+      }
+
+      function renderStats() {
+        els.atlasStat.textContent = state.atlas ? state.atlas.regions.length + " regions" : "-";
+        els.pageStat.textContent = String(state.pageFiles.length);
+        els.sliceStat.textContent = String(state.sliceFiles.length);
+        els.manifestStat.textContent = state.manifest ? "有" : "无";
+      }
+
+      function renderMessages(items) {
+        els.messages.innerHTML = (items || []).map(function (item) {
+          return '<div class="message ' + escapeHtml(item.type || "") + '">' + escapeHtml(item.text) + "</div>";
+        }).join("");
+      }
+
+      function renderRows(report) {
+        var rows = [];
+        report.used.forEach(function (item, index) {
+          rows.push(rowHtml(index + 1, item.region, item.page, item.slice, item.scaled ? "已缩放回填" : "已回填"));
+        });
+        report.missing.forEach(function (item, index) {
+          rows.push(rowHtml(report.used.length + index + 1, item.region, "", "", "缺失：" + item.reason));
+        });
+        els.regionRows.innerHTML = rows.slice(0, 160).join("") || '<tr><td colspan="5">无记录</td></tr>';
+      }
+
+      function rowHtml(index, region, page, slice, status) {
+        return [
+          "<tr>",
+          "<td>", index, "</td>",
+          '<td class="name" title="', escapeHtml(region), '">', escapeHtml(region), "</td>",
+          '<td class="name" title="', escapeHtml(page), '">', escapeHtml(page), "</td>",
+          '<td class="name" title="', escapeHtml(slice), '">', escapeHtml(slice), "</td>",
+          "<td>", escapeHtml(status), "</td>",
+          "</tr>"
+        ].join("");
+      }
+
+      function previewFirstPage(pageCanvases) {
+        var first = state.atlas.pages[0];
+        if (!first || !pageCanvases[first.name]) return;
+        var source = pageCanvases[first.name].canvas;
+        var canvas = els.previewCanvas;
+        canvas.width = source.width;
+        canvas.height = source.height;
+        var ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(source, 0, 0);
+      }
+
+      function updateReadyState() {
+        els.buildButton.disabled = !(state.atlas && state.sliceFiles.length && (state.pageFiles.length || hasAtlasPageSizes()));
+      }
+
+      function hasAtlasPageSizes() {
+        return !!(state.atlas && state.atlas.pages.every(function (page) {
+          return page.width && page.height;
+        }));
+      }
+
+      function parseAtlas(text) {
+        var rawLines = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/);
+        var lines = rawLines.map(function (raw) {
+          return { raw: raw, text: raw.trim() };
+        });
+        var pages = [];
+        var regions = [];
+        var currentPage = null;
+        var currentRegion = null;
+        var afterBlank = true;
+
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].text;
+          if (!line) {
+            afterBlank = true;
+            currentRegion = null;
+            continue;
+          }
+
+          var colon = line.indexOf(":");
+          if (colon < 0) {
+            if (!currentPage || (afterBlank && nextLooksLikePage(lines, i + 1))) {
+              currentPage = { name: line, width: 0, height: 0, regions: [] };
+              pages.push(currentPage);
+              currentRegion = null;
+            } else {
+              currentRegion = {
+                name: line,
+                page: currentPage,
+                rotate: false,
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+                origWidth: 0,
+                origHeight: 0,
+                offsetX: 0,
+                offsetY: 0,
+                index: -1
+              };
+              currentPage.regions.push(currentRegion);
+              regions.push(currentRegion);
+            }
+            afterBlank = false;
+            continue;
+          }
+
+          var key = line.slice(0, colon).trim();
+          var value = line.slice(colon + 1).trim();
+          if (currentRegion) setRegionProperty(currentRegion, key, value);
+          else if (currentPage) setPageProperty(currentPage, key, value);
+          afterBlank = false;
+        }
+
+        regions.forEach(function (region) {
+          if (!region.origWidth) region.origWidth = region.width;
+          if (!region.origHeight) region.origHeight = region.height;
+        });
+        if (!pages.length) throw new Error("没有找到 page。");
+        if (!regions.length) throw new Error("没有找到 region。");
+        return { pages: pages, regions: regions };
+      }
+
+      function nextLooksLikePage(lines, start) {
+        for (var i = start; i < lines.length; i++) {
+          var line = lines[i].text;
+          if (!line) continue;
+          var colon = line.indexOf(":");
+          if (colon < 0) return false;
+          var key = line.slice(0, colon).trim().toLowerCase();
+          return key === "size" || key === "format" || key === "filter" || key === "repeat" || key === "pma";
+        }
+        return false;
+      }
+
+      function setPageProperty(page, key, value) {
+        var lower = key.toLowerCase();
+        if (lower === "size") {
+          var size = readNumbers(value);
+          page.width = size[0] || 0;
+          page.height = size[1] || 0;
+        } else {
+          page[lower] = value;
+        }
+      }
+
+      function setRegionProperty(region, key, value) {
+        var lower = key.toLowerCase();
+        var nums = readNumbers(value);
+        if (lower === "rotate") {
+          region.rotate = value === "true" || value === "90";
+        } else if (lower === "xy") {
+          region.x = nums[0] || 0;
+          region.y = nums[1] || 0;
+        } else if (lower === "size") {
+          region.width = nums[0] || 0;
+          region.height = nums[1] || 0;
+        } else if (lower === "bounds") {
+          region.x = nums[0] || 0;
+          region.y = nums[1] || 0;
+          region.width = nums[2] || 0;
+          region.height = nums[3] || 0;
+        } else if (lower === "orig") {
+          region.origWidth = nums[0] || 0;
+          region.origHeight = nums[1] || 0;
+        } else if (lower === "offset") {
+          region.offsetX = nums[0] || 0;
+          region.offsetY = nums[1] || 0;
+        } else if (lower === "offsets") {
+          region.offsetX = nums[0] || 0;
+          region.offsetY = nums[1] || 0;
+          region.origWidth = nums[2] || region.origWidth;
+          region.origHeight = nums[3] || region.origHeight;
+        } else if (lower === "index") {
+          region.index = nums[0] == null ? -1 : nums[0];
+        } else {
+          region[lower] = value;
+        }
+      }
+
+      function readNumbers(value) {
+        return String(value).split(",").map(function (part) {
+          return Number(part.trim());
+        }).filter(function (value) {
+          return isFinite(value);
+        });
+      }
+
+      function loadImage(file) {
+        return new Promise(function (resolve, reject) {
+          var url = URL.createObjectURL(file);
+          var image = new Image();
+          image.onload = function () {
+            URL.revokeObjectURL(url);
+            resolve(image);
+          };
+          image.onerror = function () {
+            URL.revokeObjectURL(url);
+            reject(new Error("PNG 载入失败：" + file.name));
+          };
+          image.src = url;
+        });
+      }
+
+      function canvasToBlob(canvas) {
+        return new Promise(function (resolve, reject) {
+          canvas.toBlob(function (blob) {
+            if (blob) resolve(blob);
+            else reject(new Error("Canvas 导出 PNG 失败。"));
+          }, "image/png");
+        });
+      }
+
+      async function createZip(files) {
+        var localParts = [];
+        var centralParts = [];
+        var offset = 0;
+        var encoder = new TextEncoder();
+        var mod = dosDateTime(new Date());
+
+        for (var i = 0; i < files.length; i++) {
+          var file = files[i];
+          var data = new Uint8Array(await file.blob.arrayBuffer());
+          var nameBytes = encoder.encode(file.name);
+          var crc = crc32(data);
+
+          var local = new Uint8Array(30 + nameBytes.length);
+          var localView = new DataView(local.buffer);
+          localView.setUint32(0, 0x04034b50, true);
+          localView.setUint16(4, 20, true);
+          localView.setUint16(6, 0x0800, true);
+          localView.setUint16(8, 0, true);
+          localView.setUint16(10, mod.time, true);
+          localView.setUint16(12, mod.date, true);
+          localView.setUint32(14, crc, true);
+          localView.setUint32(18, data.length, true);
+          localView.setUint32(22, data.length, true);
+          localView.setUint16(26, nameBytes.length, true);
+          localView.setUint16(28, 0, true);
+          local.set(nameBytes, 30);
+          localParts.push(local, data);
+
+          var central = new Uint8Array(46 + nameBytes.length);
+          var centralView = new DataView(central.buffer);
+          centralView.setUint32(0, 0x02014b50, true);
+          centralView.setUint16(4, 20, true);
+          centralView.setUint16(6, 20, true);
+          centralView.setUint16(8, 0x0800, true);
+          centralView.setUint16(10, 0, true);
+          centralView.setUint16(12, mod.time, true);
+          centralView.setUint16(14, mod.date, true);
+          centralView.setUint32(16, crc, true);
+          centralView.setUint32(20, data.length, true);
+          centralView.setUint32(24, data.length, true);
+          centralView.setUint16(28, nameBytes.length, true);
+          centralView.setUint16(30, 0, true);
+          centralView.setUint16(32, 0, true);
+          centralView.setUint16(34, 0, true);
+          centralView.setUint16(36, 0, true);
+          centralView.setUint32(38, 0, true);
+          centralView.setUint32(42, offset, true);
+          central.set(nameBytes, 46);
+          centralParts.push(central);
+          offset += local.length + data.length;
+        }
+
+        var centralSize = centralParts.reduce(function (sum, part) { return sum + part.length; }, 0);
+        var end = new Uint8Array(22);
+        var endView = new DataView(end.buffer);
+        endView.setUint32(0, 0x06054b50, true);
+        endView.setUint16(4, 0, true);
+        endView.setUint16(6, 0, true);
+        endView.setUint16(8, files.length, true);
+        endView.setUint16(10, files.length, true);
+        endView.setUint32(12, centralSize, true);
+        endView.setUint32(16, offset, true);
+        endView.setUint16(20, 0, true);
+        return new Blob(localParts.concat(centralParts, [end]), { type: "application/zip" });
+      }
+
+      var crcTable = null;
+      function crc32(data) {
+        if (!crcTable) {
+          crcTable = new Uint32Array(256);
+          for (var i = 0; i < 256; i++) {
+            var c = i;
+            for (var k = 0; k < 8; k++) {
+              c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+            }
+            crcTable[i] = c >>> 0;
+          }
+        }
+        var crc = 0xffffffff;
+        for (var j = 0; j < data.length; j++) {
+          crc = crcTable[(crc ^ data[j]) & 0xff] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      function dosDateTime(date) {
+        var year = Math.max(1980, date.getFullYear());
+        return {
+          time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+          date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()
+        };
+      }
+
+      function downloadBlob(blob, name) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+      }
+
+      function filePath(file) {
+        return normalizePath(file.webkitRelativePath || file.name || "");
+      }
+
+      function normalizePath(path) {
+        return String(path || "").replace(/\\/g, "/").replace(/^\/+/, "");
+      }
+
+      function basename(path) {
+        var normalized = normalizePath(path);
+        var index = normalized.lastIndexOf("/");
+        return index >= 0 ? normalized.slice(index + 1) : normalized;
+      }
+
+      function stripExtension(name) {
+        return String(name || "").replace(/\.[^.]+$/, "");
+      }
+
+      function safeName(name) {
+        var cleaned = String(name || "region")
+          .replace(/\.(png|jpg|jpeg|tif|tiff)$/i, "")
+          .replace(/\\/g, "/")
+          .split("/")
+          .map(function (part) {
+            return part.replace(/[<>:"|?*]+/g, "_").trim();
+          })
+          .filter(function (part) {
+            return part && part !== "." && part !== "..";
+          })
+          .join("/");
+        return cleaned || "region";
+      }
+
+      function atlasBaseName() {
+        return safeName(stripExtension(state.atlasFile ? state.atlasFile.name : "spine"));
+      }
+
+      function isPngFile(file) {
+        return !!file && (/\.png$/i.test(file.name || "") || file.type === "image/png");
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function sleep(ms) {
+        return new Promise(function (resolve) {
+          setTimeout(resolve, ms);
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (char) {
+          return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+          }[char];
+        });
+      }
+
+      window.SpineImagesToAtlas = {
+        parseAtlas: parseAtlas,
+        makeTrimmedCanvas: makeTrimmedCanvas,
+        drawRegionToAtlas: drawRegionToAtlas
+      };
+    }());
+  </script>
+</body>
+</html>
