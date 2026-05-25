@@ -257,9 +257,13 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
           <input id="preserveBaseInput" type="checkbox" checked>
           以原图集为底，只覆盖导入的切图区域
         </label>
+        <label class="check">
+          <input id="edgeFixInput" type="checkbox" checked>
+          去除三角缝/黑边（复用 PSD 重建工具的边缘清理）
+        </label>
         <div class="field">
-          <label for="overlapInput">三角缝覆盖（px）</label>
-          <input id="overlapInput" type="number" min="0" max="2" step="0.05" value="0.25">
+          <label for="overlapInput">三角缝覆盖（px，去缝开启时生效）</label>
+          <input id="overlapInput" type="number" min="0" max="2" step="0.05" value="0.65">
         </div>
       </section>
 
@@ -305,6 +309,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       scaleInput: document.getElementById("scaleInput"),
       flipVInput: document.getElementById("flipVInput"),
       preserveBaseInput: document.getElementById("preserveBaseInput"),
+      edgeFixInput: document.getElementById("edgeFixInput"),
       overlapInput: document.getElementById("overlapInput"),
       buildButton: document.getElementById("buildButton"),
       progress: document.getElementById("progress"),
@@ -703,6 +708,126 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       ctx.restore();
     }
 
+    function sealInternalAlphaGaps(canvas) {
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      const source = new Uint8ClampedArray(data);
+      const w = canvas.width;
+      const h = canvas.height;
+      const highThreshold = 216;
+      const alphaAt = (x, y) => source[(y * w + x) * 4 + 3];
+
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const i = (y * w + x) * 4;
+          const a = source[i + 3];
+          if (a <= 0 || a >= 255) continue;
+          const l = alphaAt(x - 1, y);
+          const r = alphaAt(x + 1, y);
+          const t = alphaAt(x, y - 1);
+          const b = alphaAt(x, y + 1);
+          const tl = alphaAt(x - 1, y - 1);
+          const tr = alphaAt(x + 1, y - 1);
+          const bl = alphaAt(x - 1, y + 1);
+          const br = alphaAt(x + 1, y + 1);
+          let highCount = 0;
+          let highAlpha = 0;
+          let highR = 0, highG = 0, highB = 0, highWeight = 0;
+          for (let yy = -1; yy <= 1; yy++) {
+            for (let xx = -1; xx <= 1; xx++) {
+              if (!xx && !yy) continue;
+              const ni = ((y + yy) * w + (x + xx)) * 4;
+              const na = source[ni + 3];
+              if (na > highThreshold) {
+                highCount++;
+                highAlpha += na;
+                highR += source[ni] * na;
+                highG += source[ni + 1] * na;
+                highB += source[ni + 2] * na;
+                highWeight += na;
+              }
+            }
+          }
+          const enclosedByOpaque =
+            (l > highThreshold && r > highThreshold)
+            || (t > highThreshold && b > highThreshold)
+            || (tl > highThreshold && br > highThreshold)
+            || (tr > highThreshold && bl > highThreshold)
+            || highCount >= 7;
+          if (enclosedByOpaque) {
+            if (highWeight > 0) {
+              data[i] = Math.round(highR / highWeight);
+              data[i + 1] = Math.round(highG / highWeight);
+              data[i + 2] = Math.round(highB / highWeight);
+            }
+            data[i + 3] = Math.max(a, Math.round(highAlpha / Math.max(1, highCount)));
+          }
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    function bleedTransparentRgb(canvas, iterations) {
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      const w = canvas.width;
+      const h = canvas.height;
+
+      for (let pass = 0; pass < iterations; pass++) {
+        const source = new Uint8ClampedArray(data);
+        let changed = 0;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            const a = source[i + 3];
+            if (a >= 255) continue;
+            let r = 0, g = 0, b = 0, weight = 0;
+            for (let yy = -1; yy <= 1; yy++) {
+              const ny = y + yy;
+              if (ny < 0 || ny >= h) continue;
+              for (let xx = -1; xx <= 1; xx++) {
+                const nx = x + xx;
+                if ((xx === 0 && yy === 0) || nx < 0 || nx >= w) continue;
+                const ni = (ny * w + nx) * 4;
+                const na = source[ni + 3];
+                if (na <= 16) continue;
+                r += source[ni] * na;
+                g += source[ni + 1] * na;
+                b += source[ni + 2] * na;
+                weight += na;
+              }
+            }
+            if (weight > 0) {
+              data[i] = Math.round(r / weight);
+              data[i + 1] = Math.round(g / weight);
+              data[i + 2] = Math.round(b / weight);
+              changed++;
+            }
+          }
+        }
+        if (!changed) break;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    function prepareSliceForBake(image, options) {
+      if (!options.edgeFix) return image;
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(image, 0, 0);
+      for (let i = 0; i < options.alphaGapPasses; i++) sealInternalAlphaGaps(canvas);
+      bleedTransparentRgb(canvas, options.transparentRgbBleed);
+      return canvas;
+    }
+
     function parseIndexFromFileName(fileName) {
       const match = String(fileName).match(/^\d+_(\d+)_/);
       return match ? Number(match[1]) : -1;
@@ -894,7 +1019,11 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       try {
         await waitForCore();
         const scale = Math.max(0.1, Math.min(4, Number(els.scaleInput.value) || 1));
-        const overlap = Math.max(0, Math.min(2, Number(els.overlapInput.value) || 0));
+        const edgeFix = els.edgeFixInput.checked;
+        const configuredOverlap = Math.max(0, Math.min(2, Number(els.overlapInput.value) || 0));
+        const overlap = edgeFix ? configuredOverlap : 0;
+        const alphaGapPasses = edgeFix ? 3 : 0;
+        const transparentRgbBleed = edgeFix ? 8 : 0;
         const motionIndex = els.poseSelect.value === "" ? -1 : Number(els.poseSelect.value);
         const motionEntry = motionIndex >= 0 ? project.motionEntries[motionIndex] : null;
         const motionTime = Math.max(0, Number(els.motionTimeInput.value) || 0);
@@ -927,6 +1056,10 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
         const layers = buildLayerList(project, textures, scale);
         const d = project.model.drawables;
         const report = { used: [], missing: [], skipped: [] };
+        const preparedSlices = new Map();
+        if (edgeFix) {
+          log("去缝处理：三角覆盖 " + overlap + "px，内部 alpha 修复 " + alphaGapPasses + " 次，透明 RGB 扩展 " + transparentRgbBleed + " 次");
+        }
         setProgress(0.12, "正在反向烘回 UV");
 
         for (let n = 0; n < layers.length; n++) {
@@ -948,7 +1081,12 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
             report.skipped.push({ file: layer.fileName, reason: "missing texture " + textureIndex });
             continue;
           }
-          const sliceImage = await loadImage(sliceEntry.file);
+          let sliceImage = preparedSlices.get(layer.fileName);
+          if (!sliceImage) {
+            const rawSliceImage = await loadImage(sliceEntry.file);
+            sliceImage = prepareSliceForBake(rawSliceImage, { edgeFix, alphaGapPasses, transparentRgbBleed });
+            preparedSlices.set(layer.fileName, sliceImage);
+          }
           const positions = d.vertexPositions[index];
           const uvs = d.vertexUvs[index];
           const indices = d.indices[index];
@@ -1001,7 +1139,10 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
             scale,
             flipV: els.flipVInput.checked,
             preserveBase: els.preserveBaseInput.checked,
+            edgeFix,
             overlap,
+            alphaGapPasses,
+            transparentRgbBleed,
             motion: motionEntry ? basename(motionEntry.path) : "",
             motionTime,
             sourceManifest: !!state.manifest,

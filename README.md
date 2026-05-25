@@ -142,6 +142,7 @@ Live2D 专用的切图反向还原图集工具，用于把 `live2d-psd-rebuilder
 - 根据 Cubism drawable 顶点、UV 和 texture index 逐三角形反向绘制回图集
 - 输出路径与 `.model3.json` 中的 texture 引用一致，例如 `textures/texture_00.png`
 - 可选择使用原图集为底，只覆盖导入切图覆盖到的区域
+- 可复用 PSD 重建工具的边缘清理逻辑，减少三角面接缝、黑边和透明采样边
 
 使用方式：
 
@@ -290,6 +291,7 @@ Features:
 - Uses Cubism drawable vertices, UVs, and texture indices to draw each slice back into atlas space triangle by triangle
 - Exports PNG paths matching the `.model3.json` texture references, such as `textures/texture_00.png`
 - Can preserve the original texture as the base and overwrite only imported slice regions
+- Can reuse the PSD rebuilder edge cleanup pass to reduce triangle seams, dark fringes, and transparent sampling edges
 
 Usage:
 
