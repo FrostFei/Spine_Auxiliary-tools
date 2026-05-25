@@ -258,6 +258,10 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
           以原图集为底，只覆盖导入的切图区域
         </label>
         <label class="check">
+          <input id="replacePixelsInput" type="checkbox" checked>
+          导入切图替换原区域（透明度会覆盖原图集）
+        </label>
+        <label class="check">
           <input id="edgeFixInput" type="checkbox" checked>
           去除三角缝/黑边（复用 PSD 重建工具的边缘清理）
         </label>
@@ -309,6 +313,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       scaleInput: document.getElementById("scaleInput"),
       flipVInput: document.getElementById("flipVInput"),
       preserveBaseInput: document.getElementById("preserveBaseInput"),
+      replacePixelsInput: document.getElementById("replacePixelsInput"),
       edgeFixInput: document.getElementById("edgeFixInput"),
       overlapInput: document.getElementById("overlapInput"),
       buildButton: document.getElementById("buildButton"),
@@ -680,7 +685,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       });
     }
 
-    function drawTexturedTriangle(ctx, image, source, dest, overlap) {
+    function drawTexturedTriangle(ctx, image, source, dest, overlap, replacePixels) {
       const sx0 = source[0].x, sy0 = source[0].y;
       const sx1 = source[1].x, sy1 = source[1].y;
       const sx2 = source[2].x, sy2 = source[2].y;
@@ -704,6 +709,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       ctx.closePath();
       ctx.clip();
       ctx.setTransform(a, b, c, d, e, f);
+      if (replacePixels) ctx.globalCompositeOperation = "copy";
       ctx.drawImage(image, 0, 0);
       ctx.restore();
     }
@@ -1020,6 +1026,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
         await waitForCore();
         const scale = Math.max(0.1, Math.min(4, Number(els.scaleInput.value) || 1));
         const edgeFix = els.edgeFixInput.checked;
+        const replacePixels = els.replacePixelsInput.checked;
         const configuredOverlap = Math.max(0, Math.min(2, Number(els.overlapInput.value) || 0));
         const overlap = edgeFix ? configuredOverlap : 0;
         const alphaGapPasses = edgeFix ? 3 : 0;
@@ -1107,7 +1114,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
               x: uvs[vertexIndex * 2] * texture.width,
               y: (els.flipVInput.checked ? 1 - uvs[vertexIndex * 2 + 1] : uvs[vertexIndex * 2 + 1]) * texture.height
             }));
-            drawTexturedTriangle(ctx, sliceImage, source, dest, overlap);
+            drawTexturedTriangle(ctx, sliceImage, source, dest, overlap, replacePixels);
           }
           report.used.push({
             file: layer.fileName,
@@ -1139,6 +1146,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
             scale,
             flipV: els.flipVInput.checked,
             preserveBase: els.preserveBaseInput.checked,
+            replacePixels,
             edgeFix,
             overlap,
             alphaGapPasses,
