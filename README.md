@@ -143,7 +143,7 @@ Live2D 专用的切图反向还原图集工具，用于把 `live2d-psd-rebuilder
 - 输出路径与 `.model3.json` 中的 texture 引用一致，例如 `textures/texture_00.png`
 - 可选择使用原图集为底，只覆盖导入切图覆盖到的区域
 - 导入切图可用替换模式写入，透明度变化会覆盖原图集像素
-- 可复用 PSD 重建工具的边缘清理逻辑，减少三角面接缝、黑边和透明采样边
+- 可复用 PSD 重建工具的边缘清理逻辑，导入切图和未替换原始区域都会减少三角面接缝、黑边和透明采样边
 
 使用方式：
 
@@ -293,7 +293,7 @@ Features:
 - Exports PNG paths matching the `.model3.json` texture references, such as `textures/texture_00.png`
 - Can preserve the original texture as the base and overwrite only imported slice regions
 - Can write imported slices in replace mode so alpha changes overwrite original atlas pixels
-- Can reuse the PSD rebuilder edge cleanup pass to reduce triangle seams, dark fringes, and transparent sampling edges
+- Can reuse the PSD rebuilder edge cleanup pass on imported slices and untouched original regions to reduce triangle seams, dark fringes, and transparent sampling edges
 
 Usage:
 

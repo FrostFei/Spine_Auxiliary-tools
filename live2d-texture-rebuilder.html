@@ -263,11 +263,11 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
         </label>
         <label class="check">
           <input id="edgeFixInput" type="checkbox" checked>
-          去除三角缝/黑边（复用 PSD 重建工具的边缘清理）
+          去除三角缝/黑边（同时处理未替换原始区域）
         </label>
         <div class="field">
           <label for="overlapInput">三角缝覆盖（px，去缝开启时生效）</label>
-          <input id="overlapInput" type="number" min="0" max="2" step="0.05" value="1.5">
+          <input id="overlapInput" type="number" min="0" max="20" step="0.05" value="1.5">
         </div>
       </section>
 
@@ -672,20 +672,85 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       };
     }
 
+    function signedPolygonArea(points) {
+      let area = 0;
+      for (let i = 0; i < points.length; i++) {
+        const next = points[(i + 1) % points.length];
+        area += points[i].x * next.y - next.x * points[i].y;
+      }
+      return area / 2;
+    }
+
+    function lineIntersection(a0, a1, b0, b1) {
+      const dax = a1.x - a0.x;
+      const day = a1.y - a0.y;
+      const dbx = b1.x - b0.x;
+      const dby = b1.y - b0.y;
+      const denom = dax * dby - day * dbx;
+      if (Math.abs(denom) < 0.00001) return null;
+      const t = ((b0.x - a0.x) * dby - (b0.y - a0.y) * dbx) / denom;
+      return { x: a0.x + dax * t, y: a0.y + day * t };
+    }
+
     function expandTriangle(points, amount) {
       if (!amount) return points;
+      const area = signedPolygonArea(points);
+      if (Math.abs(area) < 0.0001) return points;
+      const outwardSign = area > 0 ? 1 : -1;
+      const lines = points.map((point, index) => {
+        const next = points[(index + 1) % points.length];
+        const dx = next.x - point.x;
+        const dy = next.y - point.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 0.0001) return null;
+        const nx = outwardSign * dy / len;
+        const ny = outwardSign * -dx / len;
+        return {
+          a: { x: point.x + nx * amount, y: point.y + ny * amount },
+          b: { x: next.x + nx * amount, y: next.y + ny * amount }
+        };
+      });
       const cx = (points[0].x + points[1].x + points[2].x) / 3;
       const cy = (points[0].y + points[1].y + points[2].y) / 3;
-      return points.map(point => {
-        const dx = point.x - cx;
-        const dy = point.y - cy;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        if (len < 0.0001) return point;
-        return { x: point.x + dx / len * amount, y: point.y + dy / len * amount };
+      const miterLimit = Math.max(amount * 8, amount + 8);
+      return points.map((point, index) => {
+        const previous = lines[(index + lines.length - 1) % lines.length];
+        const current = lines[index];
+        let expanded = previous && current ? lineIntersection(previous.a, previous.b, current.a, current.b) : null;
+        if (!expanded) {
+          const dx = point.x - cx;
+          const dy = point.y - cy;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          expanded = len < 0.0001 ? point : { x: point.x + dx / len * amount, y: point.y + dy / len * amount };
+        }
+        const mdx = expanded.x - point.x;
+        const mdy = expanded.y - point.y;
+        const miter = Math.sqrt(mdx * mdx + mdy * mdy);
+        if (miter <= miterLimit) return expanded;
+        const scale = miterLimit / miter;
+        return { x: point.x + mdx * scale, y: point.y + mdy * scale };
       });
     }
 
-    function drawTexturedTriangle(ctx, image, source, dest, overlap, replacePixels) {
+    function traceTrianglePath(ctx, points) {
+      ctx.moveTo(points[0].x, points[0].y);
+      ctx.lineTo(points[1].x, points[1].y);
+      ctx.lineTo(points[2].x, points[2].y);
+      ctx.closePath();
+    }
+
+    function clearTriangleRegion(ctx, triangles) {
+      if (!triangles.length) return;
+      ctx.save();
+      ctx.beginPath();
+      for (const triangle of triangles) traceTrianglePath(ctx, triangle.dest);
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = "#000";
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawTexturedTriangle(ctx, image, source, dest, overlap) {
       const sx0 = source[0].x, sy0 = source[0].y;
       const sx1 = source[1].x, sy1 = source[1].y;
       const sx2 = source[2].x, sy2 = source[2].y;
@@ -703,13 +768,9 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       const clip = expandTriangle(dest, overlap || 0);
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(clip[0].x, clip[0].y);
-      ctx.lineTo(clip[1].x, clip[1].y);
-      ctx.lineTo(clip[2].x, clip[2].y);
-      ctx.closePath();
+      traceTrianglePath(ctx, clip);
       ctx.clip();
       ctx.setTransform(a, b, c, d, e, f);
-      if (replacePixels) ctx.globalCompositeOperation = "copy";
       ctx.drawImage(image, 0, 0);
       ctx.restore();
     }
@@ -834,6 +895,39 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       return canvas;
     }
 
+    function renderOriginalLayerSlice(project, textures, layer, options) {
+      const d = project.model.drawables;
+      const index = layer.index;
+      const texture = textures[layer.textureIndex];
+      if (!texture) return null;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(layer.width));
+      canvas.height = Math.max(1, Math.round(layer.height));
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      const positions = d.vertexPositions[index];
+      const uvs = d.vertexUvs[index];
+      const indices = d.indices[index];
+      const points = [];
+      for (let i = 0; i < positions.length; i += 2) {
+        points.push(convertPoint(positions[i], positions[i + 1], project.canvas, options.scale));
+      }
+      for (let i = 0; i < indices.length; i += 3) {
+        const ia = indices[i], ib = indices[i + 1], ic = indices[i + 2];
+        const source = [ia, ib, ic].map(vertexIndex => ({
+          x: uvs[vertexIndex * 2] * texture.width,
+          y: (options.flipV ? 1 - uvs[vertexIndex * 2 + 1] : uvs[vertexIndex * 2 + 1]) * texture.height
+        }));
+        const dest = [points[ia], points[ib], points[ic]].map(point => ({
+          x: point.x - layer.left,
+          y: point.y - layer.top
+        }));
+        drawTexturedTriangle(ctx, texture, source, dest, options.overlap);
+      }
+      return prepareSliceForBake(canvas, options);
+    }
+
     function parseIndexFromFileName(fileName) {
       const match = String(fileName).match(/^\d+_(\d+)_/);
       return match ? Number(match[1]) : -1;
@@ -882,8 +976,16 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
       return meta;
     }
 
-    function buildLayerList(project, textures, scale) {
+    function originalLayerFileName(project, index) {
+      const d = project.model.drawables;
+      const id = d.ids[index] || ("drawable_" + index);
+      const order = Number(d.renderOrders[index]) || 0;
+      return "__original__/" + String(order).padStart(4, "0") + "_" + String(index).padStart(4, "0") + "_" + safeName(id, "drawable") + ".png";
+    }
+
+    function buildLayerList(project, textures, scale, includeOriginals) {
       const layers = [];
+      const importedIndices = new Set();
       const sliceNames = Array.from(state.slices.keys()).sort(naturalSort);
       for (const fileName of sliceNames) {
         let meta = layerMetaFromManifest(fileName);
@@ -897,6 +999,21 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
           meta.fileName = fileName;
         }
         layers.push(meta);
+        if (typeof meta.index === "number" && meta.index >= 0) importedIndices.add(meta.index);
+      }
+      if (includeOriginals) {
+        const d = project.model.drawables;
+        for (let index = 0; index < d.count; index++) {
+          if (importedIndices.has(index)) continue;
+          const textureIndex = d.textureIndices[index];
+          if (textureIndex < 0 || !textures[textureIndex]) continue;
+          const computed = computeLayerMeta(project, textures, index, scale);
+          layers.push({
+            ...computed,
+            fileName: originalLayerFileName(project, index),
+            originalTexture: true
+          });
+        }
       }
       return layers.sort((a, b) => (a.renderOrder || 0) - (b.renderOrder || 0) || (a.index || 0) - (b.index || 0));
     }
@@ -1027,7 +1144,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
         const scale = Math.max(0.1, Math.min(4, Number(els.scaleInput.value) || 1));
         const edgeFix = els.edgeFixInput.checked;
         const replacePixels = els.replacePixelsInput.checked;
-        const configuredOverlap = Math.max(0, Math.min(2, Number(els.overlapInput.value) || 0));
+        const configuredOverlap = Math.max(0, Math.min(20, Number(els.overlapInput.value) || 0));
         const overlap = edgeFix ? configuredOverlap : 0;
         const alphaGapPasses = edgeFix ? 3 : 0;
         const transparentRgbBleed = edgeFix ? 8 : 0;
@@ -1042,6 +1159,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
         }
         const motionResult = applyMotion(project.model, motion, motionTime);
         if (motionEntry) log("应用参数数：" + motionResult.applied);
+        state.computedMeta.clear();
 
         setProgress(0.05, "正在读取原贴图");
         const textures = [];
@@ -1060,19 +1178,21 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
           log("目标图集 " + i + "：" + project.textureEntries[i].refPath + " (" + image.width + "x" + image.height + ")");
         }
 
-        const layers = buildLayerList(project, textures, scale);
+        const includeOriginalEdgeFix = edgeFix && els.preserveBaseInput.checked;
+        const layers = buildLayerList(project, textures, scale, includeOriginalEdgeFix);
         const d = project.model.drawables;
-        const report = { used: [], missing: [], skipped: [] };
+        const report = { used: [], originalEdgeFixed: [], missing: [], skipped: [] };
         const preparedSlices = new Map();
         if (edgeFix) {
           log("去缝处理：三角覆盖 " + overlap + "px，内部 alpha 修复 " + alphaGapPasses + " 次，透明 RGB 扩展 " + transparentRgbBleed + " 次");
+          if (includeOriginalEdgeFix) log("未导入替换的原始 ArtMesh 也会按同一流程重建并去缝。");
         }
         setProgress(0.12, "正在反向烘回 UV");
 
         for (let n = 0; n < layers.length; n++) {
           const layer = layers[n];
           const sliceEntry = state.slices.get(layer.fileName);
-          if (!sliceEntry || layer.missingMeta) {
+          if ((!sliceEntry || layer.missingMeta) && !layer.originalTexture) {
             report.missing.push(layer.fileName);
             continue;
           }
@@ -1090,8 +1210,23 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
           }
           let sliceImage = preparedSlices.get(layer.fileName);
           if (!sliceImage) {
-            const rawSliceImage = await loadImage(sliceEntry.file);
-            sliceImage = prepareSliceForBake(rawSliceImage, { edgeFix, alphaGapPasses, transparentRgbBleed });
+            if (layer.originalTexture) {
+              sliceImage = renderOriginalLayerSlice(project, textures, layer, {
+                scale,
+                flipV: els.flipVInput.checked,
+                edgeFix,
+                overlap,
+                alphaGapPasses,
+                transparentRgbBleed
+              });
+              if (!sliceImage) {
+                report.skipped.push({ file: layer.fileName, reason: "failed to render original drawable" });
+                continue;
+              }
+            } else {
+              const rawSliceImage = await loadImage(sliceEntry.file);
+              sliceImage = prepareSliceForBake(rawSliceImage, { edgeFix, alphaGapPasses, transparentRgbBleed });
+            }
             preparedSlices.set(layer.fileName, sliceImage);
           }
           const positions = d.vertexPositions[index];
@@ -1104,6 +1239,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
           const ctx = textureCanvas.getContext("2d");
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = "high";
+          const triangles = [];
           for (let i = 0; i < indices.length; i += 3) {
             const ia = indices[i], ib = indices[i + 1], ic = indices[i + 2];
             const source = [points[ia], points[ib], points[ic]].map(point => ({
@@ -1114,9 +1250,13 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
               x: uvs[vertexIndex * 2] * texture.width,
               y: (els.flipVInput.checked ? 1 - uvs[vertexIndex * 2 + 1] : uvs[vertexIndex * 2 + 1]) * texture.height
             }));
-            drawTexturedTriangle(ctx, sliceImage, source, dest, overlap, replacePixels);
+            triangles.push({ source, dest });
           }
-          report.used.push({
+          if (replacePixels) clearTriangleRegion(ctx, triangles);
+          for (const triangle of triangles) {
+            drawTexturedTriangle(ctx, sliceImage, triangle.source, triangle.dest, overlap);
+          }
+          const reportItem = {
             file: layer.fileName,
             index,
             textureIndex,
@@ -1124,7 +1264,9 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
             top: layer.top,
             width: sliceImage.width,
             height: sliceImage.height
-          });
+          };
+          if (layer.originalTexture) report.originalEdgeFixed.push(reportItem);
+          else report.used.push(reportItem);
           if (n % 8 === 0) await sleep(0);
           setProgress(0.12 + 0.72 * ((n + 1) / layers.length), "反向烘回 " + (n + 1) + " / " + layers.length);
         }
@@ -1148,6 +1290,7 @@ var Live2DCubismCore;!function(Live2DCubismCore){var _scriptDir,_csm=function(){
             preserveBase: els.preserveBaseInput.checked,
             replacePixels,
             edgeFix,
+            originalEdgeFix: includeOriginalEdgeFix,
             overlap,
             alphaGapPasses,
             transparentRgbBleed,
